@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,11 +24,13 @@
 #include "Common.h"
 #include "DB2Stores.h"
 #include "DatabaseEnv.h"
+#include "GameTime.h"
 #include "GridNotifiersImpl.h"
 #include "Group.h"
 #include "Guild.h"
 #include "GuildMgr.h"
 #include "Language.h"
+#include "LanguageMgr.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
@@ -76,17 +77,17 @@ void WorldSession::HandleChatMessageOpcode(WorldPackets::Chat::ChatMessage& chat
             return;
     }
 
-    HandleChatMessage(type, chatMessage.Language, chatMessage.Text);
+    HandleChatMessage(type, Language(chatMessage.Language), chatMessage.Text);
 }
 
 void WorldSession::HandleChatMessageWhisperOpcode(WorldPackets::Chat::ChatMessageWhisper& chatMessageWhisper)
 {
-    HandleChatMessage(CHAT_MSG_WHISPER, chatMessageWhisper.Language, chatMessageWhisper.Text, chatMessageWhisper.Target);
+    HandleChatMessage(CHAT_MSG_WHISPER, Language(chatMessageWhisper.Language), chatMessageWhisper.Text, chatMessageWhisper.Target);
 }
 
 void WorldSession::HandleChatMessageChannelOpcode(WorldPackets::Chat::ChatMessageChannel& chatMessageChannel)
 {
-    HandleChatMessage(CHAT_MSG_CHANNEL, chatMessageChannel.Language, chatMessageChannel.Text, chatMessageChannel.Target);
+    HandleChatMessage(CHAT_MSG_CHANNEL, Language(chatMessageChannel.Language), chatMessageChannel.Text, chatMessageChannel.Target);
 }
 
 void WorldSession::HandleChatMessageEmoteOpcode(WorldPackets::Chat::ChatMessageEmote& chatMessageEmote)
@@ -94,7 +95,7 @@ void WorldSession::HandleChatMessageEmoteOpcode(WorldPackets::Chat::ChatMessageE
     HandleChatMessage(CHAT_MSG_EMOTE, LANG_UNIVERSAL, chatMessageEmote.Text);
 }
 
-void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg, std::string target /*= ""*/)
+void WorldSession::HandleChatMessage(ChatMsg type, Language lang, std::string msg, std::string target /*= ""*/)
 {
     Player* sender = GetPlayer();
 
@@ -106,27 +107,18 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
     }
 
     // prevent talking at unknown language (cheating)
-    LanguageDesc const* langDesc = GetLanguageDescByID(lang);
-    if (!langDesc)
+    auto languageData = sLanguageMgr->GetLanguageDescById(lang);
+    if (languageData.begin() == languageData.end())
     {
         SendNotification(LANG_UNKNOWN_LANGUAGE);
         return;
     }
 
-    if (langDesc->skill_id != 0 && !sender->HasSkill(langDesc->skill_id))
+    if (std::none_of(languageData.begin(), languageData.end(),
+        [sender](std::pair<uint32 const, LanguageDesc> const& langDesc) { return langDesc.second.SkillId == 0 || sender->HasSkill(langDesc.second.SkillId); }))
     {
         // also check SPELL_AURA_COMPREHEND_LANGUAGE (client offers option to speak in that language)
-        Unit::AuraEffectList const& langAuras = sender->GetAuraEffectsByType(SPELL_AURA_COMPREHEND_LANGUAGE);
-        bool foundAura = false;
-        for (Unit::AuraEffectList::const_iterator i = langAuras.begin(); i != langAuras.end(); ++i)
-        {
-            if ((*i)->GetMiscValue() == int32(lang))
-            {
-                foundAura = true;
-                break;
-            }
-        }
-        if (!foundAura)
+        if (!sender->HasAuraTypeWithMiscvalue(SPELL_AURA_COMPREHEND_LANGUAGE, lang))
         {
             SendNotification(LANG_NOT_LEARNED_LANGUAGE);
             return;
@@ -166,12 +158,12 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
         // but overwrite it by SPELL_AURA_MOD_LANGUAGE auras (only single case used)
         Unit::AuraEffectList const& ModLangAuras = sender->GetAuraEffectsByType(SPELL_AURA_MOD_LANGUAGE);
         if (!ModLangAuras.empty())
-            lang = ModLangAuras.front()->GetMiscValue();
+            lang = Language(ModLangAuras.front()->GetMiscValue());
     }
 
-    if (!sender->CanSpeak())
+    if (!CanSpeak())
     {
-        std::string timeStr = secsToTimeString(m_muteTime - time(NULL));
+        std::string timeStr = secsToTimeString(m_muteTime - GameTime::GetGameTime());
         SendNotification(GetTrinityString(LANG_WAIT_BEFORE_SPEAKING), timeStr.c_str());
         return;
     }
@@ -217,7 +209,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
                 return;
             }
 
-            sender->Say(msg, Language(lang));
+            sender->Say(msg, lang);
             break;
         }
         case CHAT_MSG_EMOTE:
@@ -247,7 +239,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
                 return;
             }
 
-            sender->Yell(msg, Language(lang));
+            sender->Yell(msg, lang);
             break;
         }
         case CHAT_MSG_WHISPER:
@@ -291,7 +283,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
                 (HasPermission(rbac::RBAC_PERM_CAN_FILTER_WHISPERS) && !sender->isAcceptWhispers() && !sender->IsInWhisperWhiteList(receiver->GetGUID())))
                 sender->AddWhisperWhiteList(receiver->GetGUID());
 
-            GetPlayer()->Whisper(msg, Language(lang), receiver);
+            GetPlayer()->Whisper(msg, lang, receiver);
             break;
         }
         case CHAT_MSG_PARTY:
@@ -311,7 +303,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
 
             WorldPackets::Chat::Chat packet;
-            packet.Initialize(ChatMsg(type), Language(lang), sender, nullptr, msg);
+            packet.Initialize(ChatMsg(type), lang, sender, nullptr, msg);
             group->BroadcastPacket(packet.Write(), false, group->GetMemberGroup(GetPlayer()->GetGUID()));
             break;
         }
@@ -353,7 +345,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
 
             WorldPackets::Chat::Chat packet;
-            packet.Initialize(ChatMsg(type), Language(lang), sender, nullptr, msg);
+            packet.Initialize(ChatMsg(type), lang, sender, nullptr, msg);
             group->BroadcastPacket(packet.Write(), false);
             break;
         }
@@ -367,7 +359,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
 
             WorldPackets::Chat::Chat packet;
             //in battleground, raid warning is sent only to players in battleground - code is ok
-            packet.Initialize(CHAT_MSG_RAID_WARNING, Language(lang), sender, NULL, msg);
+            packet.Initialize(CHAT_MSG_RAID_WARNING, lang, sender, nullptr, msg);
             group->BroadcastPacket(packet.Write(), false);
             break;
         }
@@ -385,7 +377,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
             if (Channel* chn = ChannelMgr::GetChannelForPlayerByNamePart(target, sender))
             {
                 sScriptMgr->OnPlayerChat(sender, type, lang, msg, chn);
-                chn->Say(sender->GetGUID(), msg.c_str(), lang);
+                chn->Say(sender->GetGUID(), msg, lang);
             }
             break;
         }
@@ -401,7 +393,7 @@ void WorldSession::HandleChatMessage(ChatMsg type, uint32 lang, std::string msg,
             sScriptMgr->OnPlayerChat(GetPlayer(), type, lang, msg, group);
 
             WorldPackets::Chat::Chat packet;
-            packet.Initialize(ChatMsg(type), Language(lang), sender, nullptr, msg);
+            packet.Initialize(ChatMsg(type), lang, sender, nullptr, msg);
             group->BroadcastPacket(packet.Write(), false);
             break;
         }
@@ -431,6 +423,9 @@ void WorldSession::HandleChatAddonMessage(ChatMsg type, std::string prefix, std:
 
     // Disabled addon channel?
     if (!sWorld->getBoolConfig(CONFIG_ADDON_CHANNEL))
+        return;
+
+    if (prefix == AddonChannelCommandHandler::PREFIX && AddonChannelCommandHandler(this).ParseCommands(text.c_str()))
         return;
 
     switch (type)
@@ -527,6 +522,9 @@ void WorldSession::HandleChatMessageAFKOpcode(WorldPackets::Chat::ChatMessageAFK
         sender->ToggleAFK();
     }
 
+    if (Guild* guild = sender->GetGuild())
+        guild->SendEventAwayChanged(sender->GetGUID(), sender->isAFK(), sender->isDND());
+
     sScriptMgr->OnPlayerChat(sender, CHAT_MSG_AFK, LANG_UNIVERSAL, chatMessageAFK.Text);
 }
 
@@ -560,6 +558,9 @@ void WorldSession::HandleChatMessageDNDOpcode(WorldPackets::Chat::ChatMessageDND
         sender->ToggleDND();
     }
 
+    if (Guild* guild = sender->GetGuild())
+        guild->SendEventAwayChanged(sender->GetGUID(), sender->isAFK(), sender->isDND());
+
     sScriptMgr->OnPlayerChat(sender, CHAT_MSG_DND, LANG_UNIVERSAL, chatMessageDND.Text);
 }
 
@@ -570,8 +571,7 @@ void WorldSession::HandleEmoteOpcode(WorldPackets::Chat::EmoteClient& /* packet 
 
     sScriptMgr->OnPlayerClearEmote(GetPlayer());
 
-    if (_player->GetUInt32Value(UNIT_NPC_EMOTESTATE))
-        _player->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
+    _player->SetEmoteState(EMOTE_ONESHOT_NONE);
 }
 
 void WorldSession::HandleTextEmoteOpcode(WorldPackets::Chat::CTextEmote& packet)
@@ -579,9 +579,9 @@ void WorldSession::HandleTextEmoteOpcode(WorldPackets::Chat::CTextEmote& packet)
     if (!_player->IsAlive())
         return;
 
-    if (!_player->CanSpeak())
+    if (!CanSpeak())
     {
-        std::string timeStr = secsToTimeString(m_muteTime - time(NULL));
+        std::string timeStr = secsToTimeString(m_muteTime - GameTime::GetGameTime());
         SendNotification(GetTrinityString(LANG_WAIT_BEFORE_SPEAKING), timeStr.c_str());
         return;
     }
@@ -603,13 +603,13 @@ void WorldSession::HandleTextEmoteOpcode(WorldPackets::Chat::CTextEmote& packet)
             break;
         case EMOTE_STATE_DANCE:
         case EMOTE_STATE_READ:
-            _player->SetUInt32Value(UNIT_NPC_EMOTESTATE, emoteAnim);
+            _player->SetEmoteState(Emote(emoteAnim));
             break;
         default:
             // Only allow text-emotes for "dead" entities (feign death included)
             if (_player->HasUnitState(UNIT_STATE_DIED))
                 break;
-            _player->HandleEmoteCommand(emoteAnim);
+            _player->HandleEmoteCommand(emoteAnim, { packet.SpellVisualKitIDs.data(), packet.SpellVisualKitIDs.data() + packet.SpellVisualKitIDs.size() });
             break;
     }
 
@@ -629,6 +629,9 @@ void WorldSession::HandleTextEmoteOpcode(WorldPackets::Chat::CTextEmote& packet)
     if (unit)
         if (Creature* creature = unit->ToCreature())
             creature->AI()->ReceiveEmote(_player, packet.EmoteID);
+
+    if (emoteAnim != EMOTE_ONESHOT_NONE)
+        _player->RemoveAurasWithInterruptFlags(SpellAuraInterruptFlags::Anim);
 }
 
 void WorldSession::HandleChatIgnoredOpcode(WorldPackets::Chat::ChatReportIgnored& chatReportIgnored)

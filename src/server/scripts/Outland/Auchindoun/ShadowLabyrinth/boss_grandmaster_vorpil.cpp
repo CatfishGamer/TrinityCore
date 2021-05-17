@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -138,9 +137,9 @@ class boss_grandmaster_vorpil : public CreatureScript
                 Talk(SAY_DEATH);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_SHADOWBOLT_VOLLEY, urand(7000, 14000));
                 if (IsHeroic())
                     events.ScheduleEvent(EVENT_BANISH, 17000);
@@ -187,13 +186,13 @@ class boss_grandmaster_vorpil : public CreatureScript
                             break;
                         case EVENT_DRAW_SHADOWS:
                             {
-                                Map::PlayerList const &PlayerList = me->GetMap()->GetPlayers();
+                                Map::PlayerList const& PlayerList = me->GetMap()->GetPlayers();
                                 for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
                                     if (Player* i_pl = i->GetSource())
                                         if (i_pl->IsAlive() && !i_pl->HasAura(SPELL_BANISH))
                                             i_pl->TeleportTo(me->GetMapId(), VorpilPosition.GetPositionX(), VorpilPosition.GetPositionY(), VorpilPosition.GetPositionZ(), VorpilPosition.GetOrientation(), TELE_TO_NOT_LEAVE_COMBAT);
 
-                                me->SetPosition(VorpilPosition);
+                                me->UpdatePosition(VorpilPosition);
                                 DoCast(me, SPELL_DRAW_SHADOWS, true);
                                 DoCast(me, SPELL_RAIN_OF_FIRE);
                                 events.ScheduleEvent(EVENT_SHADOWBOLT_VOLLEY, 6000);
@@ -251,7 +250,7 @@ class npc_voidtraveler : public CreatureScript
                 Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) override { }
+            void JustEngagedWith(Unit* /*who*/) override { }
 
             void UpdateAI(uint32 diff) override
             {

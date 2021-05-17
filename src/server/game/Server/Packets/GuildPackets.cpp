@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,6 +29,7 @@ WorldPackets::Guild::QueryGuildInfoResponse::QueryGuildInfoResponse()
 WorldPacket const* WorldPackets::Guild::QueryGuildInfoResponse::Write()
 {
     _worldPacket << GuildGuid;
+    _worldPacket << PlayerGuid;
     _worldPacket.WriteBit(Info.is_initialized());
     _worldPacket.FlushBits();
 
@@ -67,7 +68,7 @@ WorldPacket const* WorldPackets::Guild::GuildRoster::Write()
     _worldPacket.AppendPackedTime(CreateDate);
     _worldPacket << int32(GuildFlags);
     _worldPacket << uint32(MemberData.size());
-    _worldPacket.WriteBits(WelcomeText.length(), 10);
+    _worldPacket.WriteBits(WelcomeText.length(), 11);
     _worldPacket.WriteBits(InfoText.length(), 11);
     _worldPacket.FlushBits();
 
@@ -92,7 +93,7 @@ WorldPacket const* WorldPackets::Guild::GuildRosterUpdate::Write()
 
 void WorldPackets::Guild::GuildUpdateMotdText::Read()
 {
-    uint32 textLen = _worldPacket.ReadBits(10);
+    uint32 textLen = _worldPacket.ReadBits(11);
     MotdText = _worldPacket.ReadString(textLen);
 }
 
@@ -187,6 +188,16 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Guild::GuildRosterMemberD
     return data;
 }
 
+WorldPacket const* WorldPackets::Guild::GuildEventStatusChange::Write()
+{
+    _worldPacket << Guid;
+    _worldPacket.WriteBit(AFK);
+    _worldPacket.WriteBit(DND);
+    _worldPacket.FlushBits();
+
+    return &_worldPacket;
+}
+
 WorldPacket const* WorldPackets::Guild::GuildEventPresenceChange::Write()
 {
     _worldPacket << Guid;
@@ -204,7 +215,7 @@ WorldPacket const* WorldPackets::Guild::GuildEventPresenceChange::Write()
 
 WorldPacket const* WorldPackets::Guild::GuildEventMotd::Write()
 {
-    _worldPacket.WriteBits(MotdText.length(), 10);
+    _worldPacket.WriteBits(MotdText.length(), 11);
     _worldPacket.FlushBits();
 
     _worldPacket.WriteString(MotdText);
@@ -261,12 +272,10 @@ WorldPacket const* WorldPackets::Guild::GuildEventPlayerLeft::Write()
 {
     _worldPacket.WriteBit(Removed);
     _worldPacket.WriteBits(LeaverName.length(), 6);
-    _worldPacket.FlushBits();
 
     if (Removed)
     {
         _worldPacket.WriteBits(RemoverName.length(), 6);
-        _worldPacket.FlushBits();
 
         _worldPacket << RemoverGUID;
         _worldPacket << uint32(RemoverVirtualRealmAddress);
@@ -302,7 +311,6 @@ void WorldPackets::Guild::GuildSetRankPermissions::Read()
     _worldPacket >> RankID;
     _worldPacket >> RankOrder;
     _worldPacket >> Flags;
-    _worldPacket >> OldFlags;
     _worldPacket >> WithdrawGoldLimit;
 
     for (uint8 i = 0; i < GUILD_BANK_MAX_TABS; i++)
@@ -315,6 +323,8 @@ void WorldPackets::Guild::GuildSetRankPermissions::Read()
     uint32 rankNameLen = _worldPacket.ReadBits(7);
 
     RankName = _worldPacket.ReadString(rankNameLen);
+
+    _worldPacket >> OldFlags;
 }
 
 WorldPacket const* WorldPackets::Guild::GuildEventNewLeader::Write()
@@ -358,8 +368,8 @@ WorldPacket const* WorldPackets::Guild::GuildEventTabTextChanged::Write()
 
 ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Guild::GuildRankData const& rankData)
 {
-    data << uint32(rankData.RankID);
-    data << uint32(rankData.RankOrder);
+    data << uint8(rankData.RankID);
+    data << int32(rankData.RankOrder);
     data << uint32(rankData.Flags);
     data << uint32(rankData.WithdrawGoldLimit);
 
@@ -511,7 +521,7 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::Guild::GuildRewardItem co
     data << uint32(rewardItem.ItemID);
     data << uint32(rewardItem.Unk4);
     data << uint32(rewardItem.AchievementsRequired.size());
-    data << uint64(rewardItem.RaceMask);
+    data << uint64(rewardItem.RaceMask.RawValue);
     data << int32(rewardItem.MinGuildLevel);
     data << int32(rewardItem.MinGuildRep);
     data << uint64(rewardItem.Cost);
@@ -529,7 +539,7 @@ void WorldPackets::Guild::RequestGuildRewardsList::Read()
 
 WorldPacket const* WorldPackets::Guild::GuildRewardList::Write()
 {
-    _worldPacket << int32(Version);
+    _worldPacket << Version;
     _worldPacket << uint32(RewardItems.size());
 
     for (GuildRewardItem const& item : RewardItems)
@@ -806,15 +816,10 @@ WorldPacket const* WorldPackets::Guild::PlayerSaveGuildEmblem::Write()
 
 void WorldPackets::Guild::GuildSetAchievementTracking::Read()
 {
-    uint32 count;
-    _worldPacket >> count;
+    AchievementIDs.resize(_worldPacket.read<uint32>());
 
-    for (uint32 i = 0; i < count; ++i)
-    {
-        uint32 value;
-        _worldPacket >> value;
-        AchievementIDs.insert(value);
-    }
+    for (uint32& achievementID : AchievementIDs)
+        _worldPacket >> achievementID;
 }
 
 WorldPacket const* WorldPackets::Guild::GuildNameChanged::Write()

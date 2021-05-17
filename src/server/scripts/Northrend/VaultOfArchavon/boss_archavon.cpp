@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -76,14 +76,14 @@ class boss_archavon : public CreatureScript
             {
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 events.ScheduleEvent(EVENT_ROCK_SHARDS, 15000);
                 events.ScheduleEvent(EVENT_CHOKING_CLOUD, 30000);
                 events.ScheduleEvent(EVENT_STOMP, 45000);
                 events.ScheduleEvent(EVENT_BERSERK, 300000);
 
-                _EnterCombat();
+                _JustEngagedWith();
             }
 
             // Below UpdateAI may need review/debug.
@@ -166,7 +166,7 @@ class npc_archavon_warder : public CreatureScript
                 events.ScheduleEvent(EVENT_WHIRL, 7500);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 DoZoneInCombat();
             }
@@ -243,12 +243,12 @@ class spell_archavon_rock_shards : public SpellScriptLoader
 
                 for (uint8 i = 0; i < 3; ++i)
                 {
-                    caster->CastSpell((Unit*)NULL, SPELL_ROCK_SHARDS_VISUAL_L, true);
-                    caster->CastSpell((Unit*)NULL, SPELL_ROCK_SHARDS_VISUAL_R, true);
+                    caster->CastSpell(nullptr, SPELL_ROCK_SHARDS_VISUAL_L, true);
+                    caster->CastSpell(nullptr, SPELL_ROCK_SHARDS_VISUAL_R, true);
                 }
 
-                caster->CastSpell((Unit*)NULL, SPELL_ROCK_SHARDS_DAMAGE_L, true);
-                caster->CastSpell((Unit*)NULL, SPELL_ROCK_SHARDS_DAMAGE_R, true);
+                caster->CastSpell(nullptr, SPELL_ROCK_SHARDS_DAMAGE_L, true);
+                caster->CastSpell(nullptr, SPELL_ROCK_SHARDS_DAMAGE_R, true);
             }
 
             void Register() override

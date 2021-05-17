@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -94,7 +93,6 @@ enum Misc
 
     DATA_OHGANOT_SO_FAST        = 5762,
 
-    FACTION_NONE                = 1665
 };
 
 enum SummonGroups
@@ -132,9 +130,9 @@ class boss_mandokir : public CreatureScript
                 _reviveGUID.Clear();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 Talk(SAY_AGGRO);
 
                 DoCastAOE(SPELL_BLOODLORD_AURA);
@@ -145,7 +143,7 @@ class boss_mandokir : public CreatureScript
                     {
                         if (Creature* chainedSpirit = ObjectAccessor::GetCreature(*me, *itr))
                             if (chainedSpirit->GetEntry() == NPC_CHAINED_SPIRIT && chainedSpirit->AI())
-                                chainedSpirit->setFaction(FACTION_NONE);
+                                chainedSpirit->SetFaction(FACTION_NONE);
                     }
                 }
 
@@ -226,7 +224,7 @@ class boss_mandokir : public CreatureScript
                 return 0;
             }
 
-            void SetGUID(ObjectGuid guid, int32 /*type = 0 */) override
+            void SetGUID(ObjectGuid const& guid, int32 /*type = 0 */) override
             {
                 _reviveGUID = guid;
             }
@@ -246,7 +244,7 @@ class boss_mandokir : public CreatureScript
                     switch (eventId)
                     {
                         case EVENT_SUMMON_OHGAN:
-                            me->SetUInt32Value(UNIT_FIELD_MOUNTDISPLAYID, 0);
+                            me->SetMountDisplayId(0);
                             DoCast(me, SPELL_SUMMON_OHGAN, true);
                             break;
                         case EVENT_DECAPITATE:
@@ -315,7 +313,7 @@ class npc_ohgan : public CreatureScript
                 _instance = me->GetInstanceScript();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 DoCastAOE(SPELL_OHGAN_ORDERS, true);
             }
@@ -382,7 +380,7 @@ class npc_chained_spirit : public CreatureScript
                 _revivePlayerGUID.Clear();
             }
 
-            void SetGUID(ObjectGuid guid, int32 /*type = 0 */) override
+            void SetGUID(ObjectGuid const& guid, int32 /*type = 0 */) override
             {
                 _revivePlayerGUID = guid;
             }
@@ -502,10 +500,12 @@ class spell_mandokir_bloodletting : public SpellScriptLoader
                 if (!caster)
                     return;
 
-                int32 damage = std::max<int32>(7500, target->CountPctFromCurHealth(aurEff->GetAmount()));
+                CastSpellExtraArgs args;
+                args.TriggerFlags = TRIGGERED_FULL_MASK;
+                args.AddSpellMod(SPELLVALUE_BASE_POINT0, std::max<int32>(7500, target->CountPctFromCurHealth(aurEff->GetAmount())));
 
-                caster->CastCustomSpell(target, SPELL_BLOODLETTING_DAMAGE, &damage, 0, 0, true);
-                target->CastCustomSpell(caster, SPELL_BLOODLETTING_HEAL, &damage, 0, 0, true);
+                caster->CastSpell(target, SPELL_BLOODLETTING_DAMAGE, args);
+                target->CastSpell(caster, SPELL_BLOODLETTING_HEAL, args);
             }
 
             void Register() override
@@ -555,7 +555,7 @@ class DevastatingSlamTargetSelector : public std::unary_function<Unit *, bool>
 
         bool operator() (WorldObject* target)
         {
-            if (target == _victim && _me->getThreatManager().getThreatList().size() > 1)
+            if (target == _victim && _me->GetThreatManager().GetThreatListSize() > 1)
                 return true;
 
             if (target->GetTypeId() != TYPEID_PLAYER)
@@ -608,7 +608,7 @@ class spell_mandokir_devastating_slam : public SpellScriptLoader
                         angle = float(rand_norm()) * static_cast<float>(M_PI * 35.0f / 180.0f) - static_cast<float>(M_PI * 17.5f / 180.0f);
                         caster->GetClosePoint(x, y, z, 4.0f, frand(-2.5f, 50.0f), angle);
 
-                        caster->CastSpell(x, y, z, SPELL_DEVASTATING_SLAM_DAMAGE, true);
+                        caster->CastSpell({ x, y, z }, SPELL_DEVASTATING_SLAM_DAMAGE, true);
                     }
                 }
             }
@@ -682,9 +682,9 @@ class spell_mandokir_ohgan_orders_trigger : public SpellScriptLoader
                     // HACK: research better way
                     caster->ClearUnitState(UNIT_STATE_CASTING);
                     caster->GetMotionMaster()->Clear();
-                    caster->DeleteThreatList();
-                    caster->AddThreat(target, 50000000.0f);
-                    caster->TauntApply(target);
+                    caster->GetThreatManager().ClearAllThreat();
+                    caster->GetThreatManager().AddThreat(target, 50000000.0f);
+                    // TODO: Fixate mechanic
                 }
             }
 
@@ -715,7 +715,7 @@ class spell_mandokir_reanimate_ohgan : public SpellScriptLoader
                 {
                     target->RemoveAura(SPELL_PERMANENT_FEIGN_DEATH);
                     target->CastSpell(target, SPELL_OHGAN_HEART_VISUAL, true);
-                    target->CastSpell((Unit*)NULL, SPELL_OHGAN_ORDERS, true);
+                    target->CastSpell(nullptr, SPELL_OHGAN_ORDERS, true);
                 }
             }
 

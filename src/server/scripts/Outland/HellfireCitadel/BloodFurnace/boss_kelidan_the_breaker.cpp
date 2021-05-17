@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,13 +17,10 @@
 
 #include "ScriptMgr.h"
 #include "blood_furnace.h"
-#include "Map.h"
 #include "ObjectAccessor.h"
 #include "ScriptedCreature.h"
 #include "Spell.h"
 #include "SpellAuras.h"
-#include "SpellMgr.h"
-#include "SpellInfo.h"
 #include "TemporarySummon.h"
 
 enum Kelidan
@@ -100,12 +96,13 @@ class boss_kelidan_the_breaker : public CreatureScript
                 Initialize();
                 SummonChannelers();
                 me->SetReactState(REACT_PASSIVE);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_NON_ATTACKABLE);
+                me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                me->SetImmuneToAll(true);
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 Talk(SAY_WAKE);
                 if (me->IsNonMeleeSpellCast(false))
                     me->InterruptNonMeleeSpells(true);
@@ -144,7 +141,8 @@ class boss_kelidan_the_breaker : public CreatureScript
                         return;
                 }
                 me->SetReactState(REACT_AGGRESSIVE);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_NON_ATTACKABLE);
+                me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                me->SetImmuneToAll(false);
                 if (killer)
                     AttackStart(killer);
             }
@@ -303,7 +301,7 @@ class npc_shadowmoon_channeler : public CreatureScript
                     me->InterruptNonMeleeSpells(true);
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
                 if (Creature* Kelidan = me->FindNearestCreature(ENTRY_KELIDAN, 100))
                     ENSURE_AI(boss_kelidan_the_breaker::boss_kelidan_the_breakerAI, Kelidan->AI())->ChannelerEngaged(who);

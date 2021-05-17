@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -47,6 +47,8 @@ class WorldObject;
 struct SpellDestination;
 struct SpellModifier;
 struct SpellValue;
+enum Difficulty : uint8;
+enum class ItemContext : uint8;
 
 #define SPELL_EFFECT_ANY (uint16)-1
 #define SPELL_AURA_ANY (uint16)-1
@@ -69,7 +71,7 @@ class TC_GAME_API _SpellScript
         virtual bool _Validate(SpellInfo const* entry);
 
     public:
-        _SpellScript() : m_currentScriptState(SPELL_SCRIPT_STATE_NONE), m_scriptName(NULL), m_scriptSpellId(0) {}
+        _SpellScript() : m_currentScriptState(SPELL_SCRIPT_STATE_NONE), m_scriptName(nullptr), m_scriptSpellId(0) {}
         virtual ~_SpellScript() { }
         void _Register();
         void _Unload();
@@ -146,13 +148,13 @@ class TC_GAME_API _SpellScript
             return _ValidateSpellInfo(spellIds.begin(), spellIds.end());
         }
 
-        template<class T>
+        template <class T>
         static bool ValidateSpellInfo(T const& spellIds)
         {
             return _ValidateSpellInfo(std::begin(spellIds), std::end(spellIds));
         }
 
-private:
+    private:
         static bool _ValidateSpellInfo(uint32 const* begin, uint32 const* end);
 };
 
@@ -173,14 +175,12 @@ enum SpellScriptHookType
     SPELL_SCRIPT_HOOK_CHECK_CAST,
     SPELL_SCRIPT_HOOK_BEFORE_CAST,
     SPELL_SCRIPT_HOOK_ON_CAST,
-    SPELL_SCRIPT_HOOK_AFTER_CAST
+    SPELL_SCRIPT_HOOK_AFTER_CAST,
+    SPELL_SCRIPT_HOOK_CALC_CRIT_CHANCE
 };
 
 #define HOOK_SPELL_HIT_START SPELL_SCRIPT_HOOK_EFFECT_HIT
 #define HOOK_SPELL_HIT_END SPELL_SCRIPT_HOOK_AFTER_HIT + 1
-#define HOOK_SPELL_START SPELL_SCRIPT_HOOK_EFFECT
-#define HOOK_SPELL_END SPELL_SCRIPT_HOOK_CHECK_CAST + 1
-#define HOOK_SPELL_COUNT HOOK_SPELL_END - HOOK_SPELL_START
 
 class TC_GAME_API SpellScript : public _SpellScript
 {
@@ -193,6 +193,7 @@ class TC_GAME_API SpellScript : public _SpellScript
             typedef void(CLASSNAME::*SpellBeforeHitFnType)(SpellMissInfo missInfo); \
             typedef void(CLASSNAME::*SpellHitFnType)(); \
             typedef void(CLASSNAME::*SpellCastFnType)(); \
+            typedef void(CLASSNAME::*SpellOnCalcCritChanceFnType)(Unit* victim, float& chance); \
             typedef void(CLASSNAME::*SpellObjectAreaTargetSelectFnType)(std::list<WorldObject*>&); \
             typedef void(CLASSNAME::*SpellObjectTargetSelectFnType)(WorldObject*&); \
             typedef void(CLASSNAME::*SpellDestinationTargetSelectFnType)(SpellDestination&);
@@ -246,6 +247,15 @@ class TC_GAME_API SpellScript : public _SpellScript
                 SpellBeforeHitFnType _pBeforeHitHandlerScript;
         };
 
+        class TC_GAME_API OnCalcCritChanceHandler
+        {
+            public:
+                OnCalcCritChanceHandler(SpellOnCalcCritChanceFnType onCalcCritChanceHandlerScript);
+                void Call(SpellScript* spellScript, Unit* victim, float& critChance) const;
+            private:
+                SpellOnCalcCritChanceFnType _onCalcCritChanceHandlerScript;
+        };
+
         class TC_GAME_API TargetHook : public _SpellScript::EffectHook
         {
             public:
@@ -292,9 +302,10 @@ class TC_GAME_API SpellScript : public _SpellScript
         class EffectHandlerFunction : public SpellScript::EffectHandler { public: EffectHandlerFunction(SpellEffectFnType _pEffectHandlerScript, uint8 _effIndex, uint16 _effName) : SpellScript::EffectHandler((SpellScript::SpellEffectFnType)_pEffectHandlerScript, _effIndex, _effName) { } }; \
         class HitHandlerFunction : public SpellScript::HitHandler { public: HitHandlerFunction(SpellHitFnType _pHitHandlerScript) : SpellScript::HitHandler((SpellScript::SpellHitFnType)_pHitHandlerScript) { } }; \
         class BeforeHitHandlerFunction : public SpellScript::BeforeHitHandler { public: BeforeHitHandlerFunction(SpellBeforeHitFnType pBeforeHitHandlerScript) : SpellScript::BeforeHitHandler((SpellScript::SpellBeforeHitFnType)pBeforeHitHandlerScript) { } }; \
+        class OnCalcCritChanceHandlerFunction : public SpellScript::OnCalcCritChanceHandler { public: OnCalcCritChanceHandlerFunction(SpellOnCalcCritChanceFnType onCalcCritChanceHandlerScript) : SpellScript::OnCalcCritChanceHandler((SpellScript::SpellOnCalcCritChanceFnType)onCalcCritChanceHandlerScript) {} }; \
         class ObjectAreaTargetSelectHandlerFunction : public SpellScript::ObjectAreaTargetSelectHandler { public: ObjectAreaTargetSelectHandlerFunction(SpellObjectAreaTargetSelectFnType _pObjectAreaTargetSelectHandlerScript, uint8 _effIndex, uint16 _targetType) : SpellScript::ObjectAreaTargetSelectHandler((SpellScript::SpellObjectAreaTargetSelectFnType)_pObjectAreaTargetSelectHandlerScript, _effIndex, _targetType) { } }; \
         class ObjectTargetSelectHandlerFunction : public SpellScript::ObjectTargetSelectHandler { public: ObjectTargetSelectHandlerFunction(SpellObjectTargetSelectFnType _pObjectTargetSelectHandlerScript, uint8 _effIndex, uint16 _targetType) : SpellScript::ObjectTargetSelectHandler((SpellScript::SpellObjectTargetSelectFnType)_pObjectTargetSelectHandlerScript, _effIndex, _targetType) { } }; \
-        class DestinationTargetSelectHandlerFunction : public SpellScript::DestinationTargetSelectHandler { public: DestinationTargetSelectHandlerFunction(SpellDestinationTargetSelectFnType _DestinationTargetSelectHandlerScript, uint8 _effIndex, uint16 _targetType) : SpellScript::DestinationTargetSelectHandler((SpellScript::SpellDestinationTargetSelectFnType)_DestinationTargetSelectHandlerScript, _effIndex, _targetType) { } }
+        class DestinationTargetSelectHandlerFunction : public SpellScript::DestinationTargetSelectHandler { public: DestinationTargetSelectHandlerFunction(SpellDestinationTargetSelectFnType _DestinationTargetSelectHandlerScript, uint8 _effIndex, uint16 _targetType) : SpellScript::DestinationTargetSelectHandler((SpellScript::SpellDestinationTargetSelectFnType)_DestinationTargetSelectHandlerScript, _effIndex, _targetType) { } };
 
         #define PrepareSpellScript(CLASSNAME) SPELLSCRIPT_FUNCTION_TYPE_DEFINES(CLASSNAME) SPELLSCRIPT_FUNCTION_CAST_DEFINES(CLASSNAME)
     public:
@@ -306,6 +317,7 @@ class TC_GAME_API SpellScript : public _SpellScript
         void _PrepareScriptCall(SpellScriptHookType hookType);
         void _FinishScriptCall();
         bool IsInCheckCastHook() const;
+        bool IsAfterTargetSelectionPhase() const;
         bool IsInTargetHook() const;
         bool IsInHitPhase() const;
         bool IsInEffectHook() const;
@@ -352,6 +364,11 @@ class TC_GAME_API SpellScript : public _SpellScript
         // where function is: void function()
         #define SpellHitFn(F) HitHandlerFunction(&F)
 
+        // example: OnCalcCritChance += SpellOnCalcCritChanceFn(class::function);
+        // where function is: void function(Unit* victim, float& critChance)
+        HookList<OnCalcCritChanceHandler> OnCalcCritChance;
+        #define SpellOnCalcCritChanceFn(F) OnCalcCritChanceHandlerFunction(&F)
+
         // example: OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(class::function, EffectIndexSpecifier, TargetsNameSpecifier);
         // where function is void function(std::list<WorldObject*>& targets)
         HookList<ObjectAreaTargetSelectHandler> OnObjectAreaTargetSelect;
@@ -377,11 +394,12 @@ class TC_GAME_API SpellScript : public _SpellScript
         // 5. AfterCast - executed after spell missile is launched and immediate spell actions are done
         // 6. OnEffectLaunch - executed just before specified effect handler call - when spell missile is launched
         // 7. OnEffectLaunchTarget - executed just before specified effect handler call - when spell missile is launched - called for each target from spell target map
-        // 8. OnEffectHit - executed just before specified effect handler call - when spell missile hits dest
-        // 9. BeforeHit - executed just before spell hits a target - called for each target from spell target map
-        // 10. OnEffectHitTarget - executed just before specified effect handler call - called for each target from spell target map
-        // 11. OnHit - executed just before spell deals damage and procs auras - when spell hits target - called for each target from spell target map
-        // 12. AfterHit - executed just after spell finishes all it's jobs for target - called for each target from spell target map
+        // 8. OnCalcCritChance - executed just after specified effect handler call - when spell missile is launched - called for each target from spell target map
+        // 9. OnEffectHit - executed just before specified effect handler call - when spell missile hits dest
+        // 10. BeforeHit - executed just before spell hits a target - called for each target from spell target map
+        // 12. OnEffectHitTarget - executed just before specified effect handler call - called for each target from spell target map
+        // 13. OnHit - executed just before spell deals damage and procs auras - when spell hits target - called for each target from spell target map
+        // 14. AfterHit - executed just after spell finishes all it's jobs for target - called for each target from spell target map
 
         // this hook is only executed after a successful dispel of any aura
         // OnEffectSuccessfulDispel - executed just after effect successfully dispelled aura(s)
@@ -423,6 +441,11 @@ class TC_GAME_API SpellScript : public _SpellScript
 
         // returns: Item which was selected as an explicit spell target or NULL if there's no target
         Item* GetExplTargetItem() const;
+
+        // methods usable only after spell targets have been fully selected
+        int64 GetUnitTargetCountForEffect(SpellEffIndex effect) const;
+        int64 GetGameObjectTargetCountForEffect(SpellEffIndex effect) const;
+        int64 GetItemTargetCountForEffect(SpellEffIndex effect) const;
 
         // methods useable only during spell hit on target, or during spell launch on target:
         // returns: target of current effect if it was Unit otherwise NULL
@@ -473,7 +496,7 @@ class TC_GAME_API SpellScript : public _SpellScript
         Item* GetCastItem() const;
 
         // Creates item. Calls Spell::DoCreateItem method.
-        void CreateItem(uint32 effIndex, uint32 itemId);
+        void CreateItem(uint32 effIndex, uint32 itemId, ItemContext context);
 
         // Returns SpellInfo from the spell that triggered the current one
         SpellInfo const* GetTriggeringSpell() const;
@@ -482,6 +505,9 @@ class TC_GAME_API SpellScript : public _SpellScript
         void FinishCast(SpellCastResult result, uint32* param1 = nullptr, uint32* param2 = nullptr);
 
         void SetCustomCastResultMessage(SpellCustomErrors result);
+
+        // returns desired cast difficulty for triggered spells
+        Difficulty GetCastDifficulty() const;
 };
 
 // AuraScript interface - enum used for runtime checks of script function calls
@@ -496,6 +522,7 @@ enum AuraScriptHookType
     AURA_SCRIPT_HOOK_EFFECT_CALC_AMOUNT,
     AURA_SCRIPT_HOOK_EFFECT_CALC_PERIODIC,
     AURA_SCRIPT_HOOK_EFFECT_CALC_SPELLMOD,
+    AURA_SCRIPT_HOOK_EFFECT_CALC_CRIT_CHANCE,
     AURA_SCRIPT_HOOK_EFFECT_ABSORB,
     AURA_SCRIPT_HOOK_EFFECT_AFTER_ABSORB,
     AURA_SCRIPT_HOOK_EFFECT_MANASHIELD,
@@ -504,6 +531,7 @@ enum AuraScriptHookType
     AURA_SCRIPT_HOOK_CHECK_AREA_TARGET,
     AURA_SCRIPT_HOOK_DISPEL,
     AURA_SCRIPT_HOOK_AFTER_DISPEL,
+    AURA_SCRIPT_HOOK_ENTER_LEAVE_COMBAT,
     // Spell Proc Hooks
     AURA_SCRIPT_HOOK_CHECK_PROC,
     AURA_SCRIPT_HOOK_CHECK_EFFECT_PROC,
@@ -535,12 +563,14 @@ class TC_GAME_API AuraScript : public _SpellScript
         typedef void(CLASSNAME::*AuraEffectCalcAmountFnType)(AuraEffect const*, int32 &, bool &); \
         typedef void(CLASSNAME::*AuraEffectCalcPeriodicFnType)(AuraEffect const*, bool &, int32 &); \
         typedef void(CLASSNAME::*AuraEffectCalcSpellModFnType)(AuraEffect const*, SpellModifier* &); \
+        typedef void(CLASSNAME::*AuraEffectCalcCritChanceFnType)(AuraEffect const*, Unit*, float&); \
         typedef void(CLASSNAME::*AuraEffectAbsorbFnType)(AuraEffect*, DamageInfo &, uint32 &); \
         typedef void(CLASSNAME::*AuraEffectSplitFnType)(AuraEffect*, DamageInfo &, uint32 &); \
         typedef bool(CLASSNAME::*AuraCheckProcFnType)(ProcEventInfo&); \
         typedef bool(CLASSNAME::*AuraCheckEffectProcFnType)(AuraEffect const*, ProcEventInfo&); \
         typedef void(CLASSNAME::*AuraProcFnType)(ProcEventInfo&); \
-        typedef void(CLASSNAME::*AuraEffectProcFnType)(AuraEffect const*, ProcEventInfo&); \
+        typedef void(CLASSNAME::*AuraEffectProcFnType)(AuraEffect*, ProcEventInfo&); \
+        typedef void(CLASSNAME::*AuraEnterLeaveCombatFnType)(bool);
 
         AURASCRIPT_FUNCTION_TYPE_DEFINES(AuraScript)
 
@@ -607,6 +637,14 @@ class TC_GAME_API AuraScript : public _SpellScript
             private:
                 AuraEffectCalcSpellModFnType pEffectHandlerScript;
         };
+        class TC_GAME_API EffectCalcCritChanceHandler : public EffectBase
+        {
+            public:
+                EffectCalcCritChanceHandler(AuraEffectCalcCritChanceFnType effectHandlerScript, uint8 effIndex, uint16 effName);
+                void Call(AuraScript* auraScript, AuraEffect const* aurEff, Unit* victim, float& critChance) const;
+            private:
+                AuraEffectCalcCritChanceFnType _effectHandlerScript;
+        };
         class TC_GAME_API EffectApplyHandler : public EffectBase
         {
             public:
@@ -619,7 +657,7 @@ class TC_GAME_API AuraScript : public _SpellScript
         class TC_GAME_API EffectAbsorbHandler : public EffectBase
         {
             public:
-                EffectAbsorbHandler(AuraEffectAbsorbFnType _pEffectHandlerScript, uint8 _effIndex);
+                EffectAbsorbHandler(AuraEffectAbsorbFnType _pEffectHandlerScript, uint8 _effIndex, bool overKill);
                 void Call(AuraScript* auraScript, AuraEffect* aurEff, DamageInfo & dmgInfo, uint32 & absorbAmount);
             private:
                 AuraEffectAbsorbFnType pEffectHandlerScript;
@@ -668,9 +706,17 @@ class TC_GAME_API AuraScript : public _SpellScript
         {
             public:
                 EffectProcHandler(AuraEffectProcFnType effectHandlerScript, uint8 effIndex, uint16 effName);
-                void Call(AuraScript* auraScript, AuraEffect const* aurEff, ProcEventInfo& eventInfo);
+                void Call(AuraScript* auraScript, AuraEffect* aurEff, ProcEventInfo& eventInfo);
             private:
                 AuraEffectProcFnType _EffectHandlerScript;
+        };
+        class TC_GAME_API EnterLeaveCombatHandler
+        {
+            public:
+                EnterLeaveCombatHandler(AuraEnterLeaveCombatFnType handlerScript);
+                void Call(AuraScript* auraScript, bool isNowInCombat) const;
+            private:
+                AuraEnterLeaveCombatFnType _handlerScript;
         };
 
         #define AURASCRIPT_FUNCTION_CAST_DEFINES(CLASSNAME) \
@@ -681,23 +727,25 @@ class TC_GAME_API AuraScript : public _SpellScript
         class EffectCalcAmountHandlerFunction : public AuraScript::EffectCalcAmountHandler { public: EffectCalcAmountHandlerFunction(AuraEffectCalcAmountFnType _pEffectHandlerScript, uint8 _effIndex, uint16 _effName) : AuraScript::EffectCalcAmountHandler((AuraScript::AuraEffectCalcAmountFnType)_pEffectHandlerScript, _effIndex, _effName) { } }; \
         class EffectCalcPeriodicHandlerFunction : public AuraScript::EffectCalcPeriodicHandler { public: EffectCalcPeriodicHandlerFunction(AuraEffectCalcPeriodicFnType _pEffectHandlerScript, uint8 _effIndex, uint16 _effName) : AuraScript::EffectCalcPeriodicHandler((AuraScript::AuraEffectCalcPeriodicFnType)_pEffectHandlerScript, _effIndex, _effName) { } }; \
         class EffectCalcSpellModHandlerFunction : public AuraScript::EffectCalcSpellModHandler { public: EffectCalcSpellModHandlerFunction(AuraEffectCalcSpellModFnType _pEffectHandlerScript, uint8 _effIndex, uint16 _effName) : AuraScript::EffectCalcSpellModHandler((AuraScript::AuraEffectCalcSpellModFnType)_pEffectHandlerScript, _effIndex, _effName) { } }; \
+        class EffectCalcCritChanceHandlerFunction : public AuraScript::EffectCalcCritChanceHandler { public: EffectCalcCritChanceHandlerFunction(AuraEffectCalcCritChanceFnType effectHandlerScript, uint8 effIndex, uint16 effName) : AuraScript::EffectCalcCritChanceHandler((AuraScript::AuraEffectCalcCritChanceFnType)effectHandlerScript, effIndex, effName) { } }; \
         class EffectApplyHandlerFunction : public AuraScript::EffectApplyHandler { public: EffectApplyHandlerFunction(AuraEffectApplicationModeFnType _pEffectHandlerScript, uint8 _effIndex, uint16 _effName, AuraEffectHandleModes _mode) : AuraScript::EffectApplyHandler((AuraScript::AuraEffectApplicationModeFnType)_pEffectHandlerScript, _effIndex, _effName, _mode) { } }; \
-        class EffectAbsorbFunction : public AuraScript::EffectAbsorbHandler { public: EffectAbsorbFunction(AuraEffectAbsorbFnType _pEffectHandlerScript, uint8 _effIndex) : AuraScript::EffectAbsorbHandler((AuraScript::AuraEffectAbsorbFnType)_pEffectHandlerScript, _effIndex) { } }; \
+        class EffectAbsorbFunction : public AuraScript::EffectAbsorbHandler { public: EffectAbsorbFunction(AuraEffectAbsorbFnType _pEffectHandlerScript, uint8 _effIndex, bool overkill = false) : AuraScript::EffectAbsorbHandler((AuraScript::AuraEffectAbsorbFnType)_pEffectHandlerScript, _effIndex, overkill) { } }; \
         class EffectManaShieldFunction : public AuraScript::EffectManaShieldHandler { public: EffectManaShieldFunction(AuraEffectAbsorbFnType _pEffectHandlerScript, uint8 _effIndex) : AuraScript::EffectManaShieldHandler((AuraScript::AuraEffectAbsorbFnType)_pEffectHandlerScript, _effIndex) { } }; \
         class EffectSplitFunction : public AuraScript::EffectSplitHandler { public: EffectSplitFunction(AuraEffectSplitFnType _pEffectHandlerScript, uint8 _effIndex) : AuraScript::EffectSplitHandler((AuraScript::AuraEffectSplitFnType)_pEffectHandlerScript, _effIndex) { } }; \
         class CheckProcHandlerFunction : public AuraScript::CheckProcHandler { public: CheckProcHandlerFunction(AuraCheckProcFnType handlerScript) : AuraScript::CheckProcHandler((AuraScript::AuraCheckProcFnType)handlerScript) { } }; \
         class CheckEffectProcHandlerFunction : public AuraScript::CheckEffectProcHandler { public: CheckEffectProcHandlerFunction(AuraCheckEffectProcFnType handlerScript, uint8 effIndex, uint16 effName) : AuraScript::CheckEffectProcHandler((AuraScript::AuraCheckEffectProcFnType)handlerScript, effIndex, effName) { } }; \
         class AuraProcHandlerFunction : public AuraScript::AuraProcHandler { public: AuraProcHandlerFunction(AuraProcFnType handlerScript) : AuraScript::AuraProcHandler((AuraScript::AuraProcFnType)handlerScript) { } }; \
-        class EffectProcHandlerFunction : public AuraScript::EffectProcHandler { public: EffectProcHandlerFunction(AuraEffectProcFnType effectHandlerScript, uint8 effIndex, uint16 effName) : AuraScript::EffectProcHandler((AuraScript::AuraEffectProcFnType)effectHandlerScript, effIndex, effName) { } }
+        class EffectProcHandlerFunction : public AuraScript::EffectProcHandler { public: EffectProcHandlerFunction(AuraEffectProcFnType effectHandlerScript, uint8 effIndex, uint16 effName) : AuraScript::EffectProcHandler((AuraScript::AuraEffectProcFnType)effectHandlerScript, effIndex, effName) { } }; \
+        class EnterLeaveCombatFunction : public AuraScript::EnterLeaveCombatHandler { public: EnterLeaveCombatFunction(AuraEnterLeaveCombatFnType handlerScript) : AuraScript::EnterLeaveCombatHandler((AuraScript::AuraEnterLeaveCombatFnType)handlerScript) { } }
 
         #define PrepareAuraScript(CLASSNAME) AURASCRIPT_FUNCTION_TYPE_DEFINES(CLASSNAME) AURASCRIPT_FUNCTION_CAST_DEFINES(CLASSNAME)
 
     public:
-        AuraScript() : _SpellScript(), m_aura(NULL), m_auraApplication(NULL), m_defaultActionPrevented(false)
+        AuraScript() : _SpellScript(), m_aura(nullptr), m_auraApplication(nullptr), m_defaultActionPrevented(false)
         { }
         bool _Validate(SpellInfo const* entry) override;
         bool _Load(Aura* aura);
-        void _PrepareScriptCall(AuraScriptHookType hookType, AuraApplication const* aurApp = NULL);
+        void _PrepareScriptCall(AuraScriptHookType hookType, AuraApplication const* aurApp = nullptr);
         void _FinishScriptCall();
         bool _IsDefaultActionPrevented() const;
     private:
@@ -791,11 +839,18 @@ class TC_GAME_API AuraScript : public _SpellScript
         HookList<EffectCalcSpellModHandler> DoEffectCalcSpellMod;
         #define AuraEffectCalcSpellModFn(F, I, N) EffectCalcSpellModHandlerFunction(&F, I, N)
 
+        // executed when aura effect calculates crit chance for dots and hots
+        // example: DoEffectCalcCritChance += AuraEffectCalcCritChanceFn(class::function, EffectIndexSpecifier, EffectAuraNameSpecifier);
+        // where function is: void function (AuraEffect const* aurEff, Unit* victim, float& critChance);
+        HookList<EffectCalcCritChanceHandler> DoEffectCalcCritChance;
+        #define AuraEffectCalcCritChanceFn(F, I, N) EffectCalcCritChanceHandlerFunction(&F, I, N)
+
         // executed when absorb aura effect is going to reduce damage
         // example: OnEffectAbsorb += AuraEffectAbsorbFn(class::function, EffectIndexSpecifier);
         // where function is: void function (AuraEffect* aurEff, DamageInfo& dmgInfo, uint32& absorbAmount);
         HookList<EffectAbsorbHandler> OnEffectAbsorb;
         #define AuraEffectAbsorbFn(F, I) EffectAbsorbFunction(&F, I)
+        #define AuraEffectAbsorbOverkillFn(F, I) EffectAbsorbFunction(&F, I, true)
 
         // executed after absorb aura effect reduced damage to target - absorbAmount is real amount absorbed by aura
         // example: AfterEffectAbsorb += AuraEffectAbsorbFn(class::function, EffectIndexSpecifier);
@@ -847,13 +902,19 @@ class TC_GAME_API AuraScript : public _SpellScript
 
         // executed when aura effect procs
         // example: OnEffectProc += AuraEffectProcFn(class::function, EffectIndexSpecifier, EffectAuraNameSpecifier);
-        // where function is: void function (AuraEffect const* aurEff, ProcEventInfo& procInfo);
+        // where function is: void function (AuraEffect* aurEff, ProcEventInfo& procInfo);
         HookList<EffectProcHandler> OnEffectProc;
         // executed after aura effect proced
         // example: AfterEffectProc += AuraEffectProcFn(class::function, EffectIndexSpecifier, EffectAuraNameSpecifier);
-        // where function is: void function (AuraEffect const* aurEff, ProcEventInfo& procInfo);
+        // where function is: void function (AuraEffect* aurEff, ProcEventInfo& procInfo);
         HookList<EffectProcHandler> AfterEffectProc;
         #define AuraEffectProcFn(F, I, N) EffectProcHandlerFunction(&F, I, N)
+
+        // executed when target enters or leaves combat
+        // example: OnEnterLeaveCombat += AuraEnterLeaveCombatFn(class::function)
+        // where function is: void function (bool isNowInCombat);
+        HookList<EnterLeaveCombatHandler> OnEnterLeaveCombat;
+        #define AuraEnterLeaveCombatFn(F) EnterLeaveCombatFunction(&F)
 
         // AuraScript interface - hook/effect execution manipulators
 
@@ -935,6 +996,9 @@ class TC_GAME_API AuraScript : public _SpellScript
         Unit* GetTarget() const;
         // returns AuraApplication object of currently processed target
         AuraApplication const* GetTargetApplication() const;
+
+        // returns desired cast difficulty for triggered spells
+        Difficulty GetCastDifficulty() const;
 };
 
 //

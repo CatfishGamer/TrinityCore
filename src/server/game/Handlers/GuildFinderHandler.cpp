@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "CharacterCache.h"
 #include "WorldSession.h"
+#include "GameTime.h"
 #include "Guild.h"
 #include "GuildFinderMgr.h"
 #include "GuildFinderPackets.h"
@@ -41,7 +43,7 @@ void WorldSession::HandleGuildFinderAddRecruit(WorldPackets::GuildFinder::LFGuil
         return;
 
     MembershipRequest request = MembershipRequest(GetPlayer()->GetGUID(), lfGuildAddRecruit.GuildGUID, lfGuildAddRecruit.Availability,
-        lfGuildAddRecruit.ClassRoles, lfGuildAddRecruit.PlayStyle, lfGuildAddRecruit.Comment, time(NULL));
+        lfGuildAddRecruit.ClassRoles, lfGuildAddRecruit.PlayStyle, lfGuildAddRecruit.Comment, GameTime::GetGameTime());
     sGuildFinderMgr->AddMembershipRequest(lfGuildAddRecruit.GuildGUID, request);
 }
 
@@ -124,8 +126,8 @@ void WorldSession::HandleGuildFinderGetApplications(WorldPackets::GuildFinder::L
         applicationData.ClassRoles = guildSettings.GetClassRoles();
         applicationData.PlayStyle = guildSettings.GetInterests();
         applicationData.Availability = guildSettings.GetAvailability();
-        applicationData.SecondsSinceCreated = time(NULL) - application->GetSubmitTime();
-        applicationData.SecondsUntilExpiration = application->GetExpiryTime() - time(NULL);
+        applicationData.SecondsSinceCreated = GameTime::GetGameTime() - application->GetSubmitTime();
+        applicationData.SecondsUntilExpiration = application->GetExpiryTime() - GameTime::GetGameTime();
         applicationData.Comment = application->GetComment();
     }
 
@@ -164,7 +166,7 @@ void WorldSession::HandleGuildFinderGetRecruits(WorldPackets::GuildFinder::LFGui
     if (!guild)
         return;
 
-    time_t now = time(nullptr);
+    time_t now = GameTime::GetGameTime();
     WorldPackets::GuildFinder::LFGuildRecruits lfGuildRecruits;
     lfGuildRecruits.UpdateTime = now;
     if (std::unordered_map<ObjectGuid, MembershipRequest> const* recruitsList = sGuildFinderMgr->GetAllMembershipRequestsForGuild(guild->GetGUID()))
@@ -182,7 +184,7 @@ void WorldSession::HandleGuildFinderGetRecruits(WorldPackets::GuildFinder::LFGui
             recruitData.Availability = recruitRequestPair.second.GetAvailability();
             recruitData.SecondsSinceCreated = now - recruitRequestPair.second.GetSubmitTime();
             recruitData.SecondsUntilExpiration = recruitRequestPair.second.GetExpiryTime() - now;
-            if (CharacterInfo const* charInfo = sWorld->GetCharacterInfo(recruitRequestPair.first))
+            if (CharacterCacheEntry const* charInfo = sCharacterCache->GetCharacterCacheByGuid(recruitRequestPair.first))
             {
                 recruitData.Name = charInfo->Name;
                 recruitData.CharacterClass = charInfo->Class;

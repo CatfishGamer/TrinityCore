@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,8 +20,9 @@
 WorldPacket const* WorldPackets::ClientConfig::AccountDataTimes::Write()
 {
     _worldPacket << PlayerGuid;
-    _worldPacket << uint32(ServerTime);
-    _worldPacket.append(AccountTimes, NUM_ACCOUNT_DATA_TYPES);
+    _worldPacket << ServerTime;
+    for (Timestamp<> const& accountDataTime : AccountTimes)
+        _worldPacket << accountDataTime;
 
     return &_worldPacket;
 }
@@ -42,7 +43,7 @@ void WorldPackets::ClientConfig::RequestAccountData::Read()
 WorldPacket const* WorldPackets::ClientConfig::UpdateAccountData::Write()
 {
     _worldPacket << Player;
-    _worldPacket << uint32(Time);
+    _worldPacket << Time;
     _worldPacket << uint32(Size);
     _worldPacket.WriteBits(DataType, 3);
     _worldPacket << uint32(CompressedData.size());
@@ -59,6 +60,9 @@ void WorldPackets::ClientConfig::UserClientUpdateAccountData::Read()
     DataType = _worldPacket.ReadBits(3);
 
     uint32 compressedSize = _worldPacket.read<uint32>();
+    if (compressedSize > _worldPacket.size() - _worldPacket.rpos())
+        throw ByteBufferPositionException(_worldPacket.rpos(), _worldPacket.size(), compressedSize);
+
     if (compressedSize)
     {
         CompressedData.resize(compressedSize);

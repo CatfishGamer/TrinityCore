@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -125,7 +124,7 @@ class boss_warchief_kargath_bladefist : public CreatureScript
                 removeAdds();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
             }
@@ -179,11 +178,7 @@ class boss_warchief_kargath_bladefist : public CreatureScript
                 {
                     Creature* creature = ObjectAccessor::GetCreature(*me, *itr);
                     if (creature && creature->IsAlive())
-                    {
-                        creature->GetMotionMaster()->Clear(true);
-                        me->DealDamage(creature, creature->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
-                        creature->RemoveCorpse();
-                    }
+                        creature->DespawnOrUnsummon();
                 }
                 adds.clear();
 
@@ -191,11 +186,7 @@ class boss_warchief_kargath_bladefist : public CreatureScript
                 {
                     Creature* creature = ObjectAccessor::GetCreature(*me, *itr);
                     if (creature && creature->IsAlive())
-                    {
-                        creature->GetMotionMaster()->Clear(true);
-                        me->DealDamage(creature, creature->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, NULL, false);
-                        creature->RemoveCorpse();
-                    }
+                        creature->DespawnOrUnsummon();
                 }
                 assassins.clear();
             }

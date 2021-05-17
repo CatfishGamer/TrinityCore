@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -85,9 +84,9 @@ class boss_buru : public CreatureScript
                 Eggs.clear();
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 Talk(EMOTE_TARGET, who);
                 DoCast(me, SPELL_THORNS);
 
@@ -123,7 +122,7 @@ class boss_buru : public CreatureScript
 
                 if (Unit* victim = SelectTarget(SELECT_TARGET_RANDOM, 0, 0.0f, true))
                 {
-                    DoResetThreat();
+                    ResetThreatList();
                     AttackStart(victim);
                     Talk(EMOTE_TARGET, victim);
                 }
@@ -208,7 +207,7 @@ class npc_buru_egg : public CreatureScript
                 SetCombatMovement(false);
             }
 
-            void EnterCombat(Unit* attacker) override
+            void JustEngagedWith(Unit* attacker) override
             {
                 if (Creature* buru = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(DATA_BURU)))
                     if (!buru->IsInCombat())
@@ -262,8 +261,9 @@ class spell_egg_explosion : public SpellScriptLoader
             {
                 if (Unit* target = GetHitUnit())
                 {
-                    int32 damage = std::max<int32>(0, -16 * GetCaster()->GetDistance(target) + 500);
-                    GetCaster()->CastCustomSpell(SPELL_EXPLOSION_DAMAGE, SPELLVALUE_BASE_POINT0, damage, target, true);
+                    CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
+                    args.AddSpellBP0(std::max<int32>(0, -16 * GetCaster()->GetDistance(target) + 500));
+                    GetCaster()->CastSpell(target, SPELL_EXPLOSION_DAMAGE, args);
                 }
             }
 

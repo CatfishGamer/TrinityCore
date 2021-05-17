@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -132,6 +132,7 @@ void AddSC_boss_kirtonos_the_herald();
 void AddSC_instance_scholomance();
 void AddSC_shadowfang_keep();                //Shadowfang keep
 void AddSC_instance_shadowfang_keep();
+void AddSC_boss_apothecary_hummel();
 void AddSC_boss_magistrate_barthilas();      //Stratholme
 void AddSC_boss_maleki_the_pallid();
 void AddSC_boss_nerubenkan();
@@ -191,11 +192,9 @@ void AddSC_duskwood();
 //void AddSC_eastern_plaguelands();
 void AddSC_ghostlands();
 void AddSC_hinterlands();
-void AddSC_isle_of_queldanas();
 void AddSC_redridge_mountains();
 void AddSC_silverpine_forest();
 void AddSC_stormwind_city();
-void AddSC_stranglethorn_vale();
 void AddSC_swamp_of_sorrows();
 void AddSC_tirisfal_glades();
 void AddSC_tol_barad();
@@ -323,6 +322,7 @@ void AddEasternKingdomsScripts()
     AddSC_instance_scholomance();
     AddSC_shadowfang_keep();                //Shadowfang keep
     AddSC_instance_shadowfang_keep();
+    AddSC_boss_apothecary_hummel();
     AddSC_boss_magistrate_barthilas();      //Stratholme
     AddSC_boss_maleki_the_pallid();
     AddSC_boss_nerubenkan();
@@ -383,11 +383,9 @@ void AddEasternKingdomsScripts()
     //AddSC_eastern_plaguelands();
     AddSC_ghostlands();
     AddSC_hinterlands();
-    AddSC_isle_of_queldanas();
     AddSC_redridge_mountains();
     AddSC_silverpine_forest();
     AddSC_stormwind_city();
-    AddSC_stranglethorn_vale();
     AddSC_swamp_of_sorrows();
     AddSC_tirisfal_glades();
     AddSC_tol_barad();

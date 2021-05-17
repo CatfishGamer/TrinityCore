@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -53,9 +53,9 @@ bool DelayedSpellCastEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
     return true;
 }
 
-void firelands_bossAI::EnterCombat(Unit* target)
+void firelands_bossAI::JustEngagedWith(Unit* target)
 {
-    BossAI::EnterCombat(target);
+    BossAI::JustEngagedWith(target);
     instance->SendEncounterUnit(ENCOUNTER_FRAME_ENGAGE, me);
 }
 
@@ -111,7 +111,7 @@ struct npc_firelands_flame_archon : public ScriptedAI
         });
     }
 
-    void EnterCombat(Unit* /*attacker*/) override
+    void JustEngagedWith(Unit* /*attacker*/) override
     {
         scheduler.Schedule(Seconds(10), Seconds(12), [this](TaskContext context)
         {
@@ -178,7 +178,7 @@ struct npc_firelands_molten_flamefather : public ScriptedAI
         summon->DespawnOrUnsummon();
     }
 
-    void EnterCombat(Unit* /*attacker*/) override
+    void JustEngagedWith(Unit* /*attacker*/) override
     {
         scheduler.Schedule(Seconds(5), [this](TaskContext context)
         {
@@ -232,8 +232,8 @@ struct npc_firelands_magmakin : public ScriptedAI
         if (!target)
             return;
 
-        me->AddThreat(target, 50000000.0f);
-        me->TauntApply(target);
+        AddThreat(target, 50000000.0f);
+        // TODO: Fixate mechanic
     }
 
     void UpdateAI(uint32 /*diff*/) override

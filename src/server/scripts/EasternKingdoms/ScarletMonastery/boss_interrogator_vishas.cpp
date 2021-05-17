@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,9 +16,9 @@
  */
 
 #include "ScriptMgr.h"
+#include "scarlet_monastery.h"
 #include "InstanceScript.h"
 #include "ObjectAccessor.h"
-#include "scarlet_monastery.h"
 #include "ScriptedCreature.h"
 
 enum Says
@@ -63,10 +63,10 @@ class boss_interrogator_vishas : public CreatureScript
                 _Reset();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_SHADOW_WORD_PAIN, 5000);
             }
 

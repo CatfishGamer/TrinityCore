@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 
 #include "ScriptMgr.h"
 #include "azjol_nerub.h"
+#include "Containers.h"
 #include "InstanceScript.h"
 #include "PassiveAI.h"
 #include "ScriptedCreature.h"
@@ -131,11 +132,11 @@ class boss_krik_thir : public CreatureScript
 
         struct boss_krik_thirAI : public BossAI
         {
-            boss_krik_thirAI(Creature* creature) : BossAI(creature, DATA_KRIKTHIR_THE_GATEWATCHER), _hadGreet(false), _hadFrenzy(false), _petsInCombat(false), _watchersActive(0) { }
+            boss_krik_thirAI(Creature* creature) : BossAI(creature, DATA_KRIKTHIR), _hadFrenzy(false), _petsInCombat(false), _watchersActive(0) { }
 
             void SummonAdds()
             {
-                if (instance->GetBossState(DATA_KRIKTHIR_THE_GATEWATCHER) == DONE)
+                if (instance->GetBossState(DATA_KRIKTHIR) == DONE)
                     return;
 
                 for (uint8 i = 1; i <= 3; ++i)
@@ -156,15 +157,9 @@ class boss_krik_thir : public CreatureScript
                 me->SetReactState(REACT_PASSIVE);
             }
 
-            void InitializeAI() override
+            void JustAppeared() override
             {
-                BossAI::InitializeAI();
-                SummonAdds();
-            }
-
-            void JustRespawned() override
-            {
-                BossAI::JustRespawned();
+                BossAI::JustAppeared();
                 SummonAdds();
             }
 
@@ -181,7 +176,7 @@ class boss_krik_thir : public CreatureScript
                 Talk(SAY_DEATH);
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
                 _petsInCombat = false;
                 me->SetReactState(REACT_AGGRESSIVE);
@@ -191,7 +186,7 @@ class boss_krik_thir : public CreatureScript
                 events.ScheduleEvent(EVENT_SWARM, Seconds(5));
                 events.ScheduleEvent(EVENT_MIND_FLAY, randtime(Seconds(1), Seconds(3)));
 
-                BossAI::EnterCombat(who);
+                BossAI::JustEngagedWith(who);
             }
 
             void MoveInLineOfSight(Unit* who) override
@@ -203,7 +198,7 @@ class boss_krik_thir : public CreatureScript
                 }
 
                 if (me->CanStartAttack(who, false) && me->IsWithinDistInMap(who, me->GetAttackDistance(who) + me->m_CombatDistance))
-                    EnterCombat(who);
+                    JustEngagedWith(who);
             }
 
             void EnterEvadeMode(EvadeReason /*why*/) override
@@ -217,9 +212,9 @@ class boss_krik_thir : public CreatureScript
                 switch (action)
                 {
                     case -ACTION_GATEWATCHER_GREET:
-                        if (!_hadGreet && me->IsAlive() && !me->IsInCombat() && !_petsInCombat)
+                        if (!instance->GetData(DATA_GATEWATCHER_GREET) && me->IsAlive() && !me->IsInCombat() && !_petsInCombat)
                         {
-                            _hadGreet = true;
+                            instance->SetData(DATA_GATEWATCHER_GREET, 1);
                             Talk(SAY_PREFIGHT);
                         }
                         break;
@@ -312,7 +307,6 @@ class boss_krik_thir : public CreatureScript
             }
 
             private:
-                bool _hadGreet;
                 bool _hadFrenzy;
                 bool _petsInCombat;
                 uint8 _watchersActive;
@@ -328,8 +322,8 @@ struct npc_gatewatcher_petAI : public ScriptedAI
 {
     npc_gatewatcher_petAI(Creature* creature, bool isWatcher) : ScriptedAI(creature), _instance(creature->GetInstanceScript()), _petGroup(0), _isWatcher(isWatcher) { }
 
-    virtual void _EnterCombat() = 0;
-    void EnterCombat(Unit* who) override
+    virtual void _JustEngagedWith() = 0;
+    void JustEngagedWith(Unit* who) override
     {
         if (_isWatcher)
         {
@@ -354,8 +348,8 @@ struct npc_gatewatcher_petAI : public ScriptedAI
                 if (Creature* summoner = meSummon->GetSummonerCreatureBase())
                     summoner->AI()->DoAction(ACTION_PET_ENGAGED);
         }
-        _EnterCombat();
-        ScriptedAI::EnterCombat(who);
+        _JustEngagedWith();
+        ScriptedAI::JustEngagedWith(who);
     }
 
     void SetData(uint32 data, uint32 value) override
@@ -383,7 +377,7 @@ struct npc_gatewatcher_petAI : public ScriptedAI
         }
 
         if (me->CanStartAttack(who, false) && me->IsWithinDistInMap(who, me->GetAttackDistance(who) + me->m_CombatDistance))
-            EnterCombat(who);
+            JustEngagedWith(who);
     }
 
     void SpellHit(Unit* /*whose*/, SpellInfo const* spell) override
@@ -425,7 +419,7 @@ class npc_watcher_gashra : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_ENRAGE, randtime(Seconds(3), Seconds(5)));
                 _events.ScheduleEvent(EVENT_WEB_WRAP, randtime(Seconds(16), Seconds(19)));
@@ -434,7 +428,7 @@ class npc_watcher_gashra : public CreatureScript
 
             void JustDied(Unit* /*killer*/) override
             {
-                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR_THE_GATEWATCHER);
+                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR);
                 if (krikthir && krikthir->IsAlive())
                     krikthir->AI()->DoAction(ACTION_GASHRA_DIED);
             }
@@ -503,7 +497,7 @@ class npc_watcher_narjil : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_BLINDING_WEBS, randtime(Seconds(13), Seconds(18)));
                 _events.ScheduleEvent(EVENT_WEB_WRAP, randtime(Seconds(3), Seconds(5)));
@@ -512,7 +506,7 @@ class npc_watcher_narjil : public CreatureScript
 
             void JustDied(Unit* /*killer*/) override
             {
-                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR_THE_GATEWATCHER);
+                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR);
                 if (krikthir && krikthir->IsAlive())
                     krikthir->AI()->DoAction(ACTION_NARJIL_DIED);
             }
@@ -581,7 +575,7 @@ class npc_watcher_silthik : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_POISON_SPRAY, randtime(Seconds(16), Seconds(19)));
                 _events.ScheduleEvent(EVENT_WEB_WRAP, randtime(Seconds(7), Seconds(11)));
@@ -590,7 +584,7 @@ class npc_watcher_silthik : public CreatureScript
 
             void JustDied(Unit* /*killer*/) override
             {
-                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR_THE_GATEWATCHER);
+                Creature* krikthir = _instance->GetCreature(DATA_KRIKTHIR);
                 if (krikthir && krikthir->IsAlive())
                     krikthir->AI()->DoAction(ACTION_SILTHIK_DIED);
             }
@@ -657,7 +651,7 @@ class npc_anub_ar_warrior : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_CLEAVE, randtime(Seconds(7), Seconds(9)));
                 _events.ScheduleEvent(EVENT_STRIKE, randtime(Seconds(5), Seconds(10)));
@@ -717,7 +711,7 @@ class npc_anub_ar_skirmisher : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_ANUBAR_CHARGE, randtime(Seconds(6), Seconds(8)));
                 _events.ScheduleEvent(EVENT_BACKSTAB, randtime(Seconds(7), Seconds(9)));
@@ -785,7 +779,7 @@ class npc_anub_ar_shadowcaster : public CreatureScript
                 _events.Reset();
             }
 
-            void _EnterCombat() override
+            void _JustEngagedWith() override
             {
                 _events.ScheduleEvent(EVENT_SHADOW_BOLT, Seconds(4));
                 _events.ScheduleEvent(EVENT_SHADOW_NOVA, randtime(Seconds(10), Seconds(14)));
@@ -844,7 +838,7 @@ class npc_skittering_swarmer : public CreatureScript
             void InitializeAI() override
             {
                 ScriptedAI::InitializeAI();
-                if (Creature* gatewatcher = me->GetInstanceScript()->GetCreature(DATA_KRIKTHIR_THE_GATEWATCHER))
+                if (Creature* gatewatcher = me->GetInstanceScript()->GetCreature(DATA_KRIKTHIR))
                 {
                     if (Unit* target = gatewatcher->getAttackerForHelper())
                         AttackStart(target);
@@ -871,7 +865,7 @@ class npc_skittering_infector : public CreatureScript
             void InitializeAI() override
             {
                 ScriptedAI::InitializeAI();
-                if (Creature* gatewatcher = me->GetInstanceScript()->GetCreature(DATA_KRIKTHIR_THE_GATEWATCHER))
+                if (Creature* gatewatcher = me->GetInstanceScript()->GetCreature(DATA_KRIKTHIR))
                 {
                     if (Unit* target = gatewatcher->getAttackerForHelper())
                         AttackStart(target);
@@ -947,9 +941,7 @@ class spell_gatewatcher_subboss_trigger : public SpellScriptLoader
                 if (!targetList.empty())
                 {
                     // If there are, pick one of them at random
-                    std::list<WorldObject*>::iterator it = targetList.begin();
-                    std::advance(it, urand(0, targetList.size() - 1));
-                    target = *it;
+                    target = Trinity::Containers::SelectRandomContainerElement(targetList);
                 }
                 // And hit only that one
                 targetList.clear();

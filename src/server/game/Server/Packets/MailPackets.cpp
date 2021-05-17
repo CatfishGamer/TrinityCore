@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,6 +16,7 @@
  */
 
 #include "MailPackets.h"
+#include "GameTime.h"
 #include "Item.h"
 #include "Mail.h"
 #include "Player.h"
@@ -28,8 +29,8 @@ WorldPackets::Mail::MailAttachedItem::MailAttachedItem(::Item const* item, uint8
     Item.Initialize(item);
     Count = item->GetCount();
     Charges = item->GetSpellCharges();
-    MaxDurability = item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY);
-    Durability = item->GetUInt32Value(ITEM_FIELD_DURABILITY);
+    MaxDurability = item->m_itemData->MaxDurability;
+    Durability = item->m_itemData->Durability;
     Unlocked = !item->IsLocked();
 
     for (uint8 j = 0; j < MAX_INSPECTED_ENCHANTMENT_SLOT; j++)
@@ -42,9 +43,9 @@ WorldPackets::Mail::MailAttachedItem::MailAttachedItem(::Item const* item, uint8
     }
 
     uint8 i = 0;
-    for (ItemDynamicFieldGems const& gemData : item->GetGems())
+    for (UF::SocketedGem const& gemData : item->m_itemData->Gems)
     {
-        if (gemData.ItemId)
+        if (gemData.ItemID)
         {
             WorldPackets::Item::ItemGemData gem;
             gem.Slot = i;
@@ -100,7 +101,7 @@ WorldPackets::Mail::MailListEntry::MailListEntry(::Mail const* mail, ::Player* p
     StationeryID = mail->stationery;
     SentMoney = mail->money;
     Flags = mail->checked;
-    DaysLeft = float(mail->expire_time - time(nullptr)) / DAY;
+    DaysLeft = float(mail->expire_time - GameTime::GetGameTime()) / DAY;
     MailTemplateID = mail->mailTemplateId;
     Subject = mail->subject;
     Body = mail->body;
@@ -250,7 +251,7 @@ WorldPackets::Mail::MailQueryNextTimeResult::MailNextTimeEntry::MailNextTimeEntr
             break;
     }
 
-    TimeLeft = mail->deliver_time - time(nullptr);
+    TimeLeft = mail->deliver_time - GameTime::GetGameTime();
     AltSenderType = mail->messageType;
     StationeryID = mail->stationery;
 }
@@ -272,7 +273,7 @@ WorldPacket const* WorldPackets::Mail::MailQueryNextTimeResult::Write()
     return &_worldPacket;
 }
 
-WorldPacket const* WorldPackets::Mail::NotifyRecievedMail::Write()
+WorldPacket const* WorldPackets::Mail::NotifyReceivedMail::Write()
 {
     _worldPacket << float(Delay);
 

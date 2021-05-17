@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -182,9 +181,9 @@ public:
             portcullisGUID.Clear();
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
-            _EnterCombat();
+            _JustEngagedWith();
             events.ScheduleEvent(EVENT_WHIRLWIND,     urand(13000, 15000));
             events.ScheduleEvent(EVENT_CLEAVE,        urand(15000, 17000));
             events.ScheduleEvent(EVENT_MORTAL_STRIKE, urand(17000, 19000));
@@ -192,7 +191,7 @@ public:
 
         void IsSummonedBy(Unit* /*summoner*/) override
         {
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+            me->SetImmuneToPC(false);
             DoZoneInCombat();
         }
 

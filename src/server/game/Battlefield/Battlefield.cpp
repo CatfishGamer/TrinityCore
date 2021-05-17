@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,6 +22,7 @@
 #include "CellImpl.h"
 #include "CreatureTextMgr.h"
 #include "DB2Stores.h"
+#include "GameTime.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "Group.h"
@@ -86,7 +87,7 @@ void Battlefield::HandlePlayerEnterZone(Player* player, uint32 /*zone*/)
         else // No more vacant places
         {
             /// @todo Send a packet to announce it to player
-            m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = time(nullptr) + 10;
+            m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime() + 10;
             InvitePlayerToQueue(player);
         }
     }
@@ -165,7 +166,7 @@ bool Battlefield::Update(uint32 diff)
         // Kick players who chose not to accept invitation to the battle
         if (m_uiKickDontAcceptTimer <= diff)
         {
-            time_t now = time(nullptr);
+            time_t now = GameTime::GetGameTime();
             for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
                 for (PlayerTimerMap::iterator itr = m_InvitedPlayers[team].begin(); itr != m_InvitedPlayers[team].end(); ++itr)
                     if (itr->second <= now)
@@ -251,7 +252,7 @@ void Battlefield::InvitePlayersInZoneToWar()
                 if (m_PlayersInWar[player->GetTeamId()].size() + m_InvitedPlayers[player->GetTeamId()].size() < m_MaxPlayer)
                     InvitePlayerToWar(player);
                 else // Battlefield is full of players
-                    m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = time(nullptr) + 10;
+                    m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime() + 10;
             }
         }
     }
@@ -281,7 +282,7 @@ void Battlefield::InvitePlayerToWar(Player* player)
     if (player->getLevel() < m_MinLevel)
     {
         if (m_PlayersWillBeKick[player->GetTeamId()].count(player->GetGUID()) == 0)
-            m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = time(nullptr) + 10;
+            m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime() + 10;
         return;
     }
 
@@ -290,7 +291,7 @@ void Battlefield::InvitePlayerToWar(Player* player)
         return;
 
     m_PlayersWillBeKick[player->GetTeamId()].erase(player->GetGUID());
-    m_InvitedPlayers[player->GetTeamId()][player->GetGUID()] = time(nullptr) + m_TimeForAcceptInvite;
+    m_InvitedPlayers[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime() + m_TimeForAcceptInvite;
     player->GetSession()->SendBfInvitePlayerToWar(GetQueueId(), m_ZoneId, m_TimeForAcceptInvite);
 }
 
@@ -359,7 +360,7 @@ void Battlefield::EndBattle(bool endByTimer)
 
 void Battlefield::DoPlaySoundToAll(uint32 soundID)
 {
-    BroadcastPacketToWar(WorldPackets::Misc::PlaySound(ObjectGuid::Empty, soundID).Write());
+    BroadcastPacketToWar(WorldPackets::Misc::PlaySound(ObjectGuid::Empty, soundID, 0).Write());
 }
 
 bool Battlefield::HasPlayer(Player* player) const
@@ -493,7 +494,7 @@ void Battlefield::HideNpc(Creature* creature)
 {
     creature->CombatStop();
     creature->SetReactState(REACT_PASSIVE);
-    creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+    creature->AddUnitFlag(UnitFlags(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE));
     creature->DisappearAndDie();
     creature->SetVisible(false);
 }
@@ -501,14 +502,14 @@ void Battlefield::HideNpc(Creature* creature)
 void Battlefield::ShowNpc(Creature* creature, bool aggressive)
 {
     creature->SetVisible(true);
-    creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+    creature->RemoveUnitFlag(UnitFlags(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE));
     if (!creature->IsAlive())
         creature->Respawn(true);
     if (aggressive)
         creature->SetReactState(REACT_AGGRESSIVE);
     else
     {
-        creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+        creature->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         creature->SetReactState(REACT_PASSIVE);
     }
 }
@@ -588,7 +589,7 @@ BfGraveyard* Battlefield::GetGraveyardById(uint32 id) const
     return nullptr;
 }
 
-WorldSafeLocsEntry const* Battlefield::GetClosestGraveYard(Player* player)
+WorldSafeLocsEntry const* Battlefield::GetClosestGraveyard(Player* player)
 {
     BfGraveyard* closestGY = nullptr;
     float maxdist = -1;
@@ -609,7 +610,7 @@ WorldSafeLocsEntry const* Battlefield::GetClosestGraveYard(Player* player)
     }
 
     if (closestGY)
-        return sWorldSafeLocsStore.LookupEntry(closestGY->GetGraveyardId());
+        return sObjectMgr->GetWorldSafeLoc(closestGY->GetGraveyardId());
 
     return nullptr;
 }
@@ -682,8 +683,8 @@ void BfGraveyard::SetSpirit(Creature* spirit, TeamId team)
 
 float BfGraveyard::GetDistance(Player* player)
 {
-    WorldSafeLocsEntry const* safeLoc = sWorldSafeLocsStore.LookupEntry(m_GraveyardId);
-    return player->GetDistance2d(safeLoc->Loc.X, safeLoc->Loc.Y);
+    WorldSafeLocsEntry const* safeLoc = sObjectMgr->GetWorldSafeLoc(m_GraveyardId);
+    return player->GetDistance2d(safeLoc->Loc.GetPositionX(), safeLoc->Loc.GetPositionY());
 }
 
 void BfGraveyard::AddPlayer(ObjectGuid playerGuid)
@@ -759,12 +760,12 @@ void BfGraveyard::RelocateDeadPlayers()
             continue;
 
         if (closestGrave)
-            player->TeleportTo(player->GetMapId(), closestGrave->Loc.X, closestGrave->Loc.Y, closestGrave->Loc.Z, player->GetOrientation());
+            player->TeleportTo(closestGrave->Loc);
         else
         {
-            closestGrave = m_Bf->GetClosestGraveYard(player);
+            closestGrave = m_Bf->GetClosestGraveyard(player);
             if (closestGrave)
-                player->TeleportTo(player->GetMapId(), closestGrave->Loc.X, closestGrave->Loc.Y, closestGrave->Loc.Z, player->GetOrientation());
+                player->TeleportTo(closestGrave->Loc);
         }
     }
 }
@@ -789,21 +790,13 @@ bool BfGraveyard::HasNpc(ObjectGuid guid)
 
 Creature* Battlefield::SpawnCreature(uint32 entry, Position const& pos)
 {
-    //Get map object
-    Map* map = sMapMgr->CreateBaseMap(m_MapId);
-    if (!map)
-    {
-        TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnCreature: Can't create creature entry: %u, map not found.", entry);
-        return nullptr;
-    }
-
     if (!sObjectMgr->GetCreatureTemplate(entry))
     {
         TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnCreature: entry %u does not exist.", entry);
         return nullptr;
     }
 
-    Creature* creature = Creature::CreateCreature(entry, map, pos);
+    Creature* creature = Creature::CreateCreature(entry, m_Map, pos);
     if (!creature)
     {
         TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnCreature: Can't create creature entry: %u", entry);
@@ -813,7 +806,7 @@ Creature* Battlefield::SpawnCreature(uint32 entry, Position const& pos)
     creature->SetHomePosition(pos);
 
     // Set creature in world
-    map->AddToMap(creature);
+    m_Map->AddToMap(creature);
     creature->setActive(true);
 
     return creature;
@@ -822,14 +815,6 @@ Creature* Battlefield::SpawnCreature(uint32 entry, Position const& pos)
 // Method for spawning gameobject on map
 GameObject* Battlefield::SpawnGameObject(uint32 entry, Position const& pos, QuaternionData const& rot)
 {
-    // Get map object
-    Map* map = sMapMgr->CreateBaseMap(m_MapId);
-    if (!map)
-    {
-        TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnGameObject: Can't create GameObject (Entry: %u). Map not found.", entry);
-        return nullptr;
-    }
-
     if (!sObjectMgr->GetGameObjectTemplate(entry))
     {
         TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnGameObject: GameObject template %u not found in database! Battlefield not created!", entry);
@@ -837,7 +822,7 @@ GameObject* Battlefield::SpawnGameObject(uint32 entry, Position const& pos, Quat
     }
 
     // Create gameobject
-    GameObject* go = GameObject::CreateGameObject(entry, map, pos, rot, 255, GO_STATE_READY);
+    GameObject* go = GameObject::CreateGameObject(entry, m_Map, pos, rot, 255, GO_STATE_READY);
     if (!go)
     {
         TC_LOG_ERROR("bg.battlefield", "Battlefield::SpawnGameObject: Could not create gameobject template %u! Battlefield has not been created!", entry);
@@ -845,7 +830,7 @@ GameObject* Battlefield::SpawnGameObject(uint32 entry, Position const& pos, Quat
     }
 
     // Add to world
-    map->AddToMap(go);
+    m_Map->AddToMap(go);
     go->setActive(true);
 
     return go;

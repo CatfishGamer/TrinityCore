@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -75,9 +75,9 @@ class boss_mechano_lord_capacitus : public CreatureScript
         {
             boss_mechano_lord_capacitusAI(Creature* creature) : BossAI(creature, DATA_MECHANOLORD_CAPACITUS) { }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 Talk(YELL_AGGRO);
                 events.ScheduleEvent(EVENT_HEADCRACK, 10 * IN_MILLISECONDS);
                 events.ScheduleEvent(EVENT_REFLECTIVE_DAMAGE_SHIELD, 15 * IN_MILLISECONDS);
@@ -244,7 +244,7 @@ class spell_capacitus_polarity_shift : public SpellScriptLoader
                 Unit* target = GetHitUnit();
                 Unit* caster = GetCaster();
 
-                target->CastSpell(target, roll_chance_i(50) ? SPELL_POSITIVE_POLARITY : SPELL_NEGATIVE_POLARITY, true, NULL, NULL, caster->GetGUID());
+                target->CastSpell(target, roll_chance_i(50) ? SPELL_POSITIVE_POLARITY : SPELL_NEGATIVE_POLARITY, caster->GetGUID());
             }
 
             void Register() override

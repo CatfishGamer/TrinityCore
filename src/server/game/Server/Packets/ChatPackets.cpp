@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -176,7 +176,7 @@ WorldPacket const* WorldPackets::Chat::Chat::Write()
     _worldPacket.WriteBits(Prefix.length(), 5);
     _worldPacket.WriteBits(_Channel.length(), 7);
     _worldPacket.WriteBits(ChatText.length(), 12);
-    _worldPacket.WriteBits(_ChatFlags, 11);
+    _worldPacket.WriteBits(_ChatFlags, 14);
     _worldPacket.WriteBit(HideChatLog);
     _worldPacket.WriteBit(FakeSenderName);
     _worldPacket.WriteBit(Unused_801.is_initialized());
@@ -197,7 +197,10 @@ WorldPacket const* WorldPackets::Chat::Chat::Write()
 WorldPacket const* WorldPackets::Chat::Emote::Write()
 {
     _worldPacket << Guid;
-    _worldPacket << EmoteID;
+    _worldPacket << uint32(EmoteID);
+    _worldPacket << uint32(SpellVisualKitIDs.size());
+    if (!SpellVisualKitIDs.empty())
+        _worldPacket.append(SpellVisualKitIDs.data(), SpellVisualKitIDs.size());
 
     return &_worldPacket;
 }
@@ -207,6 +210,9 @@ void WorldPackets::Chat::CTextEmote::Read()
     _worldPacket >> Target;
     _worldPacket >> EmoteID;
     _worldPacket >> SoundIndex;
+    SpellVisualKitIDs.resize(_worldPacket.read<uint32>());
+    for (int32& spellVisualKitId : SpellVisualKitIDs)
+        _worldPacket >> spellVisualKitId;
 }
 
 WorldPacket const* WorldPackets::Chat::STextEmote::Write()
@@ -242,7 +248,7 @@ WorldPacket const* WorldPackets::Chat::ChatPlayerNotfound::Write()
 
 WorldPacket const* WorldPackets::Chat::ChatServerMessage::Write()
 {
-    _worldPacket << MessageID;
+    _worldPacket << int32(MessageID);
 
     _worldPacket.WriteBits(StringParam.length(), 11);
     _worldPacket.FlushBits();

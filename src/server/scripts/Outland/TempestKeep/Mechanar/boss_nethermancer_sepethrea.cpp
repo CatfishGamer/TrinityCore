@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -69,9 +68,9 @@ class boss_nethermancer_sepethrea : public CreatureScript
         {
             boss_nethermancer_sepethreaAI(Creature* creature) : BossAI(creature, DATA_NETHERMANCER_SEPRETHREA) { }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_FROST_ATTACK, urand(7000, 10000));
                 events.ScheduleEvent(EVENT_ARCANE_BLAST, urand(12000, 18000));
                 events.ScheduleEvent(EVENT_DRAGONS_BREATH, urand(18000, 22000));
@@ -184,7 +183,7 @@ class npc_ragin_flames : public CreatureScript
                     me->SetSpeedRate(MOVE_RUN, DUNGEON_MODE(0.5f, 0.7f));
                 }
 
-                void EnterCombat(Unit* /*who*/) override
+                void JustEngagedWith(Unit* /*who*/) override
                 {
                 }
 
@@ -196,8 +195,8 @@ class npc_ragin_flames : public CreatureScript
                         if (instance->GetData(DATA_NETHERMANCER_SEPRETHREA) != IN_PROGRESS)
                         {
                             //remove
-                            me->setDeathState(JUST_DIED);
-                            me->RemoveCorpse();
+                            me->DespawnOrUnsummon();
+                            return;
                         }
                         Check_Timer = 1000;
                     } else Check_Timer -= diff;
@@ -215,7 +214,6 @@ class npc_ragin_flames : public CreatureScript
                     if (inferno_Timer <= diff)
                     {
                         DoCastVictim(SPELL_INFERNO);
-                        me->TauntApply(me->GetVictim());
                         inferno_Timer = 10000;
                     } else inferno_Timer -= diff;
 

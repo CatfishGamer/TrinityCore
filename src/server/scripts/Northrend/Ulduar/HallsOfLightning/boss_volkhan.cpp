@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -120,21 +119,21 @@ public:
             events.ScheduleEvent(EVENT_FORGE_CAST, 2 * IN_MILLISECONDS, 0, PHASE_INTRO);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
             events.SetPhase(PHASE_NORMAL);
             events.ScheduleEvent(EVENT_PAUSE,            3.5 * IN_MILLISECONDS, 0, PHASE_NORMAL);
             events.ScheduleEvent(EVENT_SHATTERING_STOMP,   0 * IN_MILLISECONDS, 0, PHASE_NORMAL);
             events.ScheduleEvent(EVENT_SHATTER,            5 * IN_MILLISECONDS, 0, PHASE_NORMAL);
-            _EnterCombat();
+            _JustEngagedWith();
         }
 
         void AttackStart(Unit* who) override
         {
             if (me->Attack(who, true))
             {
-                me->AddThreat(who, 0.0f);
+                AddThreat(who, 0.0f);
                 me->SetInCombatWith(who);
                 who->SetInCombatWith(me);
 
@@ -201,7 +200,7 @@ public:
                     summoned->GetMotionMaster()->MoveFollow(target, 0.0f, 0.0f);
 
                 // Why healing when just summoned?
-                summoned->CastSpell(summoned, SPELL_HEAT, false, NULL, NULL, me->GetGUID());
+                summoned->CastSpell(summoned, SPELL_HEAT, CastSpellExtraArgs().SetOriginalCaster(me->GetGUID()));
             }
         }
 
@@ -327,7 +326,7 @@ public:
                     // 4 - Wait for delay to expire
                     if (m_uiDelay_Timer <= diff)
                     {
-                        if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO, 0))
+                        if (Unit* target = SelectTarget(SELECT_TARGET_MAXTHREAT, 0))
                         {
                             me->SetReactState(REACT_AGGRESSIVE);
                             me->SetInCombatWith(target);
@@ -409,7 +408,7 @@ public:
         {
             if (me->Attack(who, true))
             {
-                me->AddThreat(who, 0.0f);
+                AddThreat(who, 0.0f);
                 me->SetInCombatWith(who);
                 who->SetInCombatWith(me);
 
@@ -437,7 +436,7 @@ public:
             }
         }
 
-        void SpellHit(Unit* /*pCaster*/, const SpellInfo* pSpell) override
+        void SpellHit(Unit* /*pCaster*/, SpellInfo const* pSpell) override
         {
             // This is the dummy effect of the spells
             if (pSpell->Id == SPELL_SHATTER)

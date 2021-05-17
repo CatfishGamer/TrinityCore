@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,8 +16,10 @@
  */
 
 #include "SupportMgr.h"
+#include "CharacterCache.h"
 #include "Chat.h"
 #include "DatabaseEnv.h"
+#include "GameTime.h"
 #include "Language.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
@@ -27,11 +29,11 @@
 #include "World.h"
 #include <sstream>
 
-inline time_t GetAge(uint64 t) { return (time(nullptr) - t) / DAY; }
+inline time_t GetAge(uint64 t) { return (GameTime::GetGameTime() - t) / DAY; }
 
 Ticket::Ticket() : _id(0), _mapId(0), _createTime(0) { }
 
-Ticket::Ticket(Player* player) : _id(0), _mapId(0), _createTime(time(nullptr))
+Ticket::Ticket(Player* player) : _id(0), _mapId(0), _createTime(GameTime::GetGameTime())
 {
     _playerGuid = player->GetGUID();
 }
@@ -47,7 +49,7 @@ std::string Ticket::GetPlayerName() const
 {
     std::string name;
     if (!_playerGuid.IsEmpty())
-        ObjectMgr::GetPlayerNameByGUID(_playerGuid, name);
+        sCharacterCache->GetCharacterNameByGuid(_playerGuid, name);
 
     return name;
 }
@@ -61,7 +63,7 @@ std::string Ticket::GetAssignedToName() const
 {
     std::string name;
     if (!_assignedTo.IsEmpty())
-        ObjectMgr::GetPlayerNameByGUID(_assignedTo, name);
+        sCharacterCache->GetCharacterNameByGuid(_assignedTo, name);
 
     return name;
 }
@@ -102,7 +104,7 @@ void BugTicket::LoadFromDB(Field* fields)
     _id                 = fields[  idx].GetUInt32();
     _playerGuid         = ObjectGuid::Create<HighGuid::Player>(fields[++idx].GetUInt64());
     _note               = fields[++idx].GetString();
-    _createTime         = fields[++idx].GetUInt32();
+    _createTime         = fields[++idx].GetInt64();
     _mapId              = fields[++idx].GetUInt16();
     _pos.m_positionX    = fields[++idx].GetFloat();
     _pos.m_positionY    = fields[++idx].GetFloat();
@@ -129,10 +131,11 @@ void BugTicket::LoadFromDB(Field* fields)
 void BugTicket::SaveToDB() const
 {
     uint8 idx = 0;
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_BUG);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_BUG);
     stmt->setUInt32(idx, _id);
     stmt->setUInt64(++idx, _playerGuid.GetCounter());
     stmt->setString(++idx, _note);
+    stmt->setInt64(++idx, _createTime);
     stmt->setUInt16(++idx, _mapId);
     stmt->setFloat(++idx, _pos.GetPositionX());
     stmt->setFloat(++idx, _pos.GetPositionY());
@@ -147,14 +150,14 @@ void BugTicket::SaveToDB() const
 
 void BugTicket::DeleteFromDB()
 {
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_BUG);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_BUG);
     stmt->setUInt32(0, _id);
     CharacterDatabase.Execute(stmt);
 }
 
 std::string BugTicket::FormatViewMessageString(ChatHandler& handler, bool detailed) const
 {
-    time_t curTime = time(nullptr);
+    time_t curTime = GameTime::GetGameTime();
 
     std::stringstream ss;
     ss << handler.PGetParseString(LANG_COMMAND_TICKETLISTGUID, _id);
@@ -188,7 +191,7 @@ void ComplaintTicket::LoadFromDB(Field* fields)
     _id                     = fields[  idx].GetUInt32();
     _playerGuid             = ObjectGuid::Create<HighGuid::Player>(fields[++idx].GetUInt64());
     _note                   = fields[++idx].GetString();
-    _createTime             = fields[++idx].GetUInt32();
+    _createTime             = fields[++idx].GetInt64();
     _mapId                  = fields[++idx].GetUInt16();
     _pos.m_positionX        = fields[++idx].GetFloat();
     _pos.m_positionY        = fields[++idx].GetFloat();
@@ -219,18 +222,19 @@ void ComplaintTicket::LoadFromDB(Field* fields)
 
 void ComplaintTicket::LoadChatLineFromDB(Field* fields)
 {
-    _chatLog.Lines.emplace_back(fields[0].GetUInt32(), fields[1].GetString());
+    _chatLog.Lines.emplace_back(fields[0].GetInt64(), fields[1].GetString());
 }
 
 void ComplaintTicket::SaveToDB() const
 {
-    SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
 
     uint8 idx = 0;
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_COMPLAINT);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_COMPLAINT);
     stmt->setUInt32(idx, _id);
     stmt->setUInt64(++idx, _playerGuid.GetCounter());
     stmt->setString(++idx, _note);
+    stmt->setInt64(++idx, _createTime);
     stmt->setUInt16(++idx, _mapId);
     stmt->setFloat(++idx, _pos.GetPositionX());
     stmt->setFloat(++idx, _pos.GetPositionY());
@@ -254,7 +258,7 @@ void ComplaintTicket::SaveToDB() const
         stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GM_COMPLAINT_CHATLINE);
         stmt->setUInt32(idx, _id);
         stmt->setUInt32(++idx, lineIndex);
-        stmt->setUInt32(++idx, c.Timestamp);
+        stmt->setInt64(++idx, c.Timestamp);
         stmt->setString(++idx, c.Text);
 
         trans->Append(stmt);
@@ -266,7 +270,7 @@ void ComplaintTicket::SaveToDB() const
 
 void ComplaintTicket::DeleteFromDB()
 {
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_COMPLAINT);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_COMPLAINT);
     stmt->setUInt32(0, _id);
     CharacterDatabase.Execute(stmt);
 
@@ -277,7 +281,7 @@ void ComplaintTicket::DeleteFromDB()
 
 std::string ComplaintTicket::FormatViewMessageString(ChatHandler& handler, bool detailed) const
 {
-    time_t curTime = time(nullptr);
+    time_t curTime = GameTime::GetGameTime();
 
     std::stringstream ss;
     ss << handler.PGetParseString(LANG_COMMAND_TICKETLISTGUID, _id);
@@ -311,7 +315,7 @@ void SuggestionTicket::LoadFromDB(Field* fields)
     _id                 = fields[  idx].GetUInt32();
     _playerGuid         = ObjectGuid::Create<HighGuid::Player>(fields[++idx].GetUInt64());
     _note               = fields[++idx].GetString();
-    _createTime         = fields[++idx].GetUInt32();
+    _createTime         = fields[++idx].GetInt64();
     _mapId              = fields[++idx].GetUInt16();
     _pos.m_positionX    = fields[++idx].GetFloat();
     _pos.m_positionY    = fields[++idx].GetFloat();
@@ -338,10 +342,11 @@ void SuggestionTicket::LoadFromDB(Field* fields)
 void SuggestionTicket::SaveToDB() const
 {
     uint8 idx = 0;
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_SUGGESTION);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GM_SUGGESTION);
     stmt->setUInt32(idx, _id);
     stmt->setUInt64(++idx, _playerGuid.GetCounter());
     stmt->setString(++idx, _note);
+    stmt->setInt64(++idx, _createTime);
     stmt->setUInt16(++idx, _mapId);
     stmt->setFloat(++idx, _pos.GetPositionX());
     stmt->setFloat(++idx, _pos.GetPositionY());
@@ -356,14 +361,14 @@ void SuggestionTicket::SaveToDB() const
 
 void SuggestionTicket::DeleteFromDB()
 {
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_SUGGESTION);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GM_SUGGESTION);
     stmt->setUInt32(0, _id);
     CharacterDatabase.Execute(stmt);
 }
 
 std::string SuggestionTicket::FormatViewMessageString(ChatHandler& handler, bool detailed) const
 {
-    time_t curTime = time(nullptr);
+    time_t curTime = GameTime::GetGameTime();
 
     std::stringstream ss;
     ss << handler.PGetParseString(LANG_COMMAND_TICKETLISTGUID, _id);
@@ -475,7 +480,7 @@ void SupportMgr::LoadBugTickets()
     _lastBugId = 0;
     _openBugTicketCount = 0;
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_BUGS);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_BUGS);
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (!result)
     {
@@ -515,7 +520,7 @@ void SupportMgr::LoadComplaintTickets()
     _lastComplaintId = 0;
     _openComplaintTicketCount = 0;
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_COMPLAINTS);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_COMPLAINTS);
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (!result)
     {
@@ -524,7 +529,7 @@ void SupportMgr::LoadComplaintTickets()
     }
 
     uint32 count = 0;
-    PreparedStatement* chatLogStmt;
+    CharacterDatabasePreparedStatement* chatLogStmt;
     PreparedQueryResult chatLogResult;
     do
     {
@@ -570,7 +575,7 @@ void SupportMgr::LoadSuggestionTickets()
     _lastSuggestionId = 0;
     _openSuggestionTicketCount = 0;
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_SUGGESTIONS);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GM_SUGGESTIONS);
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (!result)
     {
@@ -704,7 +709,7 @@ TC_GAME_API void SupportMgr::ResetTickets<BugTicket>()
 
     _lastBugId = 0;
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_BUGS);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_BUGS);
     CharacterDatabase.Execute(stmt);
 }
 
@@ -717,7 +722,7 @@ TC_GAME_API void SupportMgr::ResetTickets<ComplaintTicket>()
 
     _lastComplaintId = 0;
 
-    SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
     trans->Append(CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_COMPLAINTS));
     trans->Append(CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_COMPLAINT_CHATLOGS));
     CharacterDatabase.CommitTransaction(trans);
@@ -732,7 +737,7 @@ TC_GAME_API void SupportMgr::ResetTickets<SuggestionTicket>()
 
     _lastSuggestionId = 0;
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_SUGGESTIONS);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ALL_GM_SUGGESTIONS);
     CharacterDatabase.Execute(stmt);
 }
 
@@ -792,5 +797,5 @@ TC_GAME_API void SupportMgr::ShowClosedList<SuggestionTicket>(ChatHandler& handl
 
 void SupportMgr::UpdateLastChange()
 {
-    _lastChange = uint64(time(nullptr));
+    _lastChange = GameTime::GetGameTime();
 }

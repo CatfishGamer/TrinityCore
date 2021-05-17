@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -180,7 +180,8 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             ObjectGuid Guid;
-            int32 EmoteID = 0;
+            uint32 EmoteID = 0;
+            std::vector<int32> SpellVisualKitIDs;
         };
 
         class CTextEmote final : public ClientPacket
@@ -193,6 +194,7 @@ namespace WorldPackets
             ObjectGuid Target;
             int32 EmoteID = 0;
             int32 SoundIndex = -1;
+            Array<int32, 2> SpellVisualKitIDs;
         };
 
         class STextEmote final : public ServerPacket

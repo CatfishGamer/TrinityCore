@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,6 +21,7 @@
 #include "Packet.h"
 #include "ObjectGuid.h"
 #include "Optional.h"
+#include "PacketUtilities.h"
 
 namespace WorldPackets
 {
@@ -157,7 +158,7 @@ namespace WorldPackets
             int32 Availability = 0;
             int32 ClassRoles = 0;
             int32 LevelRange = 0;
-            int32 SecondsRemaining = 0;
+            Duration<Seconds> SecondsRemaining;
             std::string Comment;
         };
 
@@ -178,7 +179,7 @@ namespace WorldPackets
 
             void Read() override;
 
-            uint32 LastUpdate = 0;
+            Timestamp<> LastUpdate;
         };
 
         struct LFGuildRecruitData
@@ -205,7 +206,7 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             std::vector<LFGuildRecruitData> Recruits;
-            time_t UpdateTime = time_t(0);
+            Timestamp<> UpdateTime;
         };
 
         class LFGuildRemoveRecruit final : public ClientPacket

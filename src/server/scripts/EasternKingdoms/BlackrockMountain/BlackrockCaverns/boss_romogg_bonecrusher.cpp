@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -75,9 +75,9 @@ class boss_romogg_bonecrusher : public CreatureScript
                     Talk(YELL_KILL);
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_CHAINS_OF_WOE, urand(22000, 32000));
                 events.ScheduleEvent(EVENT_WOUNDING_STRIKE, urand(26000, 32000));
                 events.ScheduleEvent(EVENT_QUAKE, 45000);

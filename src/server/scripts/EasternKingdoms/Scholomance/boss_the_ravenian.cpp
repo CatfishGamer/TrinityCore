@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,9 +22,9 @@ Comment:
 Category: Scholomance
 */
 
+#include "scholomance.h"
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
-#include "scholomance.h"
 
 enum Spells
 {
@@ -50,9 +50,9 @@ class boss_the_ravenian : public CreatureScript
         {
             boss_theravenianAI(Creature* creature) : BossAI(creature, DATA_THERAVENIAN) { }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_TRAMPLE, 24000);
                 events.ScheduleEvent(EVENT_CLEAVE, 15000);
                 events.ScheduleEvent(EVENT_SUNDERINCLEAVE, 40000);

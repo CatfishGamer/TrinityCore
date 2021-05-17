@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -110,10 +110,10 @@ struct generic_boss_controllerAI : public BossAI
             _Reset();
     }
 
-    void EnterCombat(Unit* /*who*/) override
+    void JustEngagedWith(Unit* /*who*/) override
     {
         if (!IsInGhostForm)
-            _EnterCombat();
+            _JustEngagedWith();
     }
 
     void JustDied(Unit* /*killer*/) override
@@ -123,7 +123,7 @@ struct generic_boss_controllerAI : public BossAI
             if (otherBoss->IsAlive())
             {
                 Talk(SAY_DIED_FIRST);
-                me->RemoveFlag(OBJECT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
+                me->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
                 otherBoss->AI()->DoAction(ACTION_OTHER_JUST_DIED);
                 DoCast(me, OtherBossData == DATA_DALRONN ? SPELL_SUMMON_SKARVALD_GHOST : SPELL_SUMMON_DALRONN_GHOST, true);
             }
@@ -187,9 +187,9 @@ class boss_skarvald_the_constructor : public CreatureScript
                 generic_boss_controllerAI::Reset();
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                generic_boss_controllerAI::EnterCombat(who);
+                generic_boss_controllerAI::JustEngagedWith(who);
 
                 if (!IsInGhostForm)
                     Talk(SAY_AGGRO);
@@ -247,9 +247,9 @@ class boss_dalronn_the_controller : public CreatureScript
                 OtherBossData = DATA_SKARVALD;
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                generic_boss_controllerAI::EnterCombat(who);
+                generic_boss_controllerAI::JustEngagedWith(who);
 
                 events.ScheduleEvent(EVENT_SHADOW_BOLT, 1000);
                 events.ScheduleEvent(EVENT_DEBILITATE, 5000);

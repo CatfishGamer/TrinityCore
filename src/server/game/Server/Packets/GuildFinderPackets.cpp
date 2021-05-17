@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -108,7 +108,7 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::GuildFinder::GuildPostDat
     data << int32(post.Availability);
     data << int32(post.ClassRoles);
     data << int32(post.LevelRange);
-    data << int32(post.SecondsRemaining);
+    data << post.SecondsRemaining;
     data.WriteString(post.Comment);
     return data;
 }
@@ -151,7 +151,7 @@ ByteBuffer& operator<<(ByteBuffer& data, WorldPackets::GuildFinder::LFGuildRecru
 WorldPacket const* WorldPackets::GuildFinder::LFGuildRecruits::Write()
 {
     _worldPacket << uint32(Recruits.size());
-    _worldPacket << uint32(UpdateTime);
+    _worldPacket << UpdateTime;
     for (LFGuildRecruitData const& recruit : Recruits)
         _worldPacket << recruit;
 

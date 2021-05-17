@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -63,10 +63,10 @@ class boss_krystallus : public CreatureScript
                 _Reset();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                _EnterCombat();
+                _JustEngagedWith();
 
                 events.ScheduleEvent(EVENT_BOULDER_TOSS, urand(3000, 9000));
                 events.ScheduleEvent(EVENT_GROUND_SLAM, urand(15000, 18000));
@@ -156,7 +156,7 @@ class spell_krystallus_shatter : public SpellScriptLoader
                 if (Unit* target = GetHitUnit())
                 {
                     target->RemoveAurasDueToSpell(SPELL_STONED);
-                    target->CastSpell((Unit*)NULL, SPELL_SHATTER_EFFECT, true);
+                    target->CastSpell(nullptr, SPELL_SHATTER_EFFECT, true);
                 }
             }
 

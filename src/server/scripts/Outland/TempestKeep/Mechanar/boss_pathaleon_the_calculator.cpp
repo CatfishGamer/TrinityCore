@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -76,9 +75,9 @@ class boss_pathaleon_the_calculator : public CreatureScript
         {
             boss_pathaleon_the_calculatorAI(Creature* creature) : BossAI(creature, DATA_PATHALEON_THE_CALCULATOR) { }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_SUMMON, 30000);
                 events.ScheduleEvent(EVENT_MANA_TAP, urand(12000, 20000));
                 events.ScheduleEvent(EVENT_ARCANE_TORRENT, urand(16000, 25000));
@@ -199,7 +198,7 @@ class npc_nether_wraith : public CreatureScript
                 Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) override { }
+            void JustEngagedWith(Unit* /*who*/) override { }
 
             void UpdateAI(uint32 diff) override
             {
@@ -232,8 +231,8 @@ class npc_nether_wraith : public CreatureScript
                 {
                     if (Die_Timer <= diff)
                     {
-                        me->setDeathState(JUST_DIED);
-                        me->RemoveCorpse();
+                        me->DespawnOrUnsummon();
+                        return;
                     }
                     else
                         Die_Timer -= diff;

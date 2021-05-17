@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,15 +20,14 @@
 #include "Map.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
+#include "PassiveAI.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
-#include "SpellAuras.h"
 #include "SpellInfo.h"
 #include "SpellScript.h"
 #include "TemporarySummon.h"
-#include "PassiveAI.h"
 
 enum Texts
 {
@@ -222,7 +221,7 @@ class boss_blood_council_controller : public CreatureScript
 
         struct boss_blood_council_controllerAI : public BossAI
         {
-            boss_blood_council_controllerAI(Creature* creature) : BossAI(creature, DATA_BLOOD_PRINCE_COUNCIL), _intro(true)
+            boss_blood_council_controllerAI(Creature* creature) : BossAI(creature, DATA_BLOOD_PRINCE_COUNCIL)
             {
                 Initialize();
                 SetCombatMovement(false);
@@ -240,11 +239,12 @@ class boss_blood_council_controller : public CreatureScript
                 Initialize();
                 me->SummonCreatureGroup(SUMMON_PRINCES_GROUP);
 
-                if (!_intro)
+                if (!instance->GetData(DATA_BLOOD_PRINCE_COUNCIL_INTRO))
                     for (uint32 bossData : PrincesData)
                         if (Creature* prince = ObjectAccessor::GetCreature(*me, instance->GetGuidData(bossData)))
                         {
-                            prince->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC);
+                            prince->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                            prince->SetImmuneToPC(false);
                             if (bossData == DATA_PRINCE_VALANAR)
                                 prince->SetHealth(prince->GetMaxHealth());
                         }
@@ -260,7 +260,7 @@ class boss_blood_council_controller : public CreatureScript
                 _DespawnAtEvade();
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
                 if (instance->GetBossState(DATA_BLOOD_PRINCE_COUNCIL) == IN_PROGRESS)
                     return;
@@ -310,7 +310,7 @@ class boss_blood_council_controller : public CreatureScript
 
             uint32 GetData(uint32 data) const override
             {
-                if (data == DATA_INTRO && !_intro)
+                if (data == DATA_INTRO && !instance->GetData(DATA_BLOOD_PRINCE_COUNCIL_INTRO))
                     return DATA_INTRO_DONE;
                 return 0;
             }
@@ -337,9 +337,9 @@ class boss_blood_council_controller : public CreatureScript
 
             void DoAction(int32 actionId) override
             {
-                if (actionId == ACTION_START_INTRO && _intro && instance->GetBossState(DATA_BLOOD_PRINCE_COUNCIL) != DONE)
+                if (actionId == ACTION_START_INTRO && instance->GetData(DATA_BLOOD_PRINCE_COUNCIL_INTRO) && instance->GetBossState(DATA_BLOOD_PRINCE_COUNCIL) != DONE)
                 {
-                    _intro = false;
+                    instance->SetData(DATA_BLOOD_PRINCE_COUNCIL_INTRO, 0);
                     if (Creature* bloodQueen = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_BLOOD_QUEEN_LANA_THEL_COUNCIL)))
                         bloodQueen->AI()->DoAction(ACTION_START_INTRO);
                 }
@@ -424,7 +424,6 @@ class boss_blood_council_controller : public CreatureScript
 
             uint32 _invocationStage;
             uint32 _resetCounter;
-            bool _intro;
         };
 
         CreatureAI* GetAI(Creature* creature) const override
@@ -444,7 +443,7 @@ struct BloodPrincesBossAI : public BossAI
     {
         _spawnHealth = 1;
         if (!me->isDead())
-            JustRespawned();
+            JustAppeared();
     }
 
     void Reset() override
@@ -453,13 +452,13 @@ struct BloodPrincesBossAI : public BossAI
         summons.DespawnAll();
         me->SetCombatPulseDelay(0);
 
-        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+        me->SetImmuneToPC(false);
         _isEmpowered = false;
         me->SetHealth(_spawnHealth);
         instance->SetData(DATA_ORB_WHISPERER_ACHIEVEMENT, uint32(true));
     }
 
-    void EnterCombat(Unit* /*who*/) override
+    void JustEngagedWith(Unit* /*who*/) override
     {
         me->SetCombatPulseDelay(5);
         me->setActive(true);
@@ -492,7 +491,7 @@ struct BloodPrincesBossAI : public BossAI
         }
     }
 
-    void JustRespawned() override
+    void JustAppeared() override
     {
         if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_BLOOD_PRINCES_CONTROL)))
             if (controller->AI()->GetData(DATA_INTRO) != DATA_INTRO_DONE)
@@ -505,7 +504,7 @@ struct BloodPrincesBossAI : public BossAI
     {
         if (!_isEmpowered)
         {
-            me->AddThreat(attacker, float(damage));
+            AddThreat(attacker, float(damage));
             damage = 0;
         }
     }
@@ -536,7 +535,7 @@ struct BloodPrincesBossAI : public BossAI
         _isEmpowered = false;
         if (Creature* controller = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_BLOOD_PRINCES_CONTROL)))
         {
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+            me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             controller->AI()->SetData(DATA_PRINCE_EVADE, 1);
         }
     }
@@ -562,10 +561,10 @@ struct BloodPrincesBossAI : public BossAI
         {
             case ACTION_STAND_UP:
                 me->RemoveAurasDueToSpell(SPELL_FEIGN_DEATH);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC);
-                me->RemoveFlag(OBJECT_DYNAMIC_FLAGS, UNIT_DYNFLAG_DEAD);
-                me->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_FEIGN_DEATH);
-                me->ForceValuesUpdateAtIndex(UNIT_NPC_FLAGS);   // was in sniff. don't ask why
+                me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                me->SetImmuneToPC(false);
+                me->RemoveDynamicFlag(UNIT_DYNFLAG_DEAD);
+                me->RemoveUnitFlag2(UNIT_FLAG2_FEIGN_DEATH);
                 me->m_Events.AddEvent(new StandUpEvent(me), me->m_Events.CalculateTime(1000));
                 break;
             case ACTION_CAST_INVOCATION:
@@ -789,7 +788,7 @@ class boss_prince_valanar_icc : public CreatureScript
 
         struct boss_prince_valanarAI : public BloodPrincesBossAI
         {
-            boss_prince_valanarAI(Creature* creature) : BloodPrincesBossAI(creature, DATA_PRINCE_TALDARAM) { }
+            boss_prince_valanarAI(Creature* creature) : BloodPrincesBossAI(creature, DATA_PRINCE_VALANAR) { }
 
             void ScheduleEvents() override
             {
@@ -806,7 +805,7 @@ class boss_prince_valanar_icc : public CreatureScript
                 {
                     case NPC_KINETIC_BOMB_TARGET:
                         summon->SetReactState(REACT_PASSIVE);
-                        summon->CastSpell(summon, SPELL_KINETIC_BOMB, true, nullptr, nullptr, me->GetGUID());
+                        summon->CastSpell(summon, SPELL_KINETIC_BOMB, me->GetGUID());
                         break;
                     case NPC_KINETIC_BOMB:
                     {
@@ -814,7 +813,7 @@ class boss_prince_valanar_icc : public CreatureScript
                         summon->GetPosition(x, y, z);
                         float ground_Z = summon->GetMap()->GetHeight(summon->GetPhaseShift(), x, y, z, true, 500.0f);
                         summon->GetMotionMaster()->MovePoint(POINT_KINETIC_BOMB_IMPACT, x, y, ground_Z);
-                        summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                        summon->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                         break;
                     }
                     case NPC_SHOCK_VORTEX:
@@ -993,7 +992,7 @@ class npc_ball_of_flame : public CreatureScript
                 }
             }
 
-            void SetGUID(ObjectGuid guid, int32 /*type*/) override
+            void SetGUID(ObjectGuid const& guid, int32 /*id*/) override
             {
                 _chaseGUID = guid;
             }
@@ -1005,7 +1004,7 @@ class npc_ball_of_flame : public CreatureScript
                     {
                         // need to clear states now because this call is before AuraEffect is fully removed
                         me->ClearUnitState(UNIT_STATE_CASTING | UNIT_STATE_STUNNED);
-                        if (target && me->Attack(target, true))
+                        if (me->Attack(target, true))
                             me->GetMotionMaster()->MoveChase(target, 1.0f);
                     }
             }
@@ -1123,17 +1122,14 @@ class npc_dark_nucleus : public CreatureScript
                 DoCastSelf(SPELL_SHADOW_RESONANCE_AURA, true);
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
                 _scheduler.Schedule(Seconds(1), [this](TaskContext targetAuraCheck)
                 {
                     if (Unit* victim = me->GetVictim())
                     {
                         if (me->GetDistance(victim) < 15.0f && !victim->HasAura(SPELL_SHADOW_RESONANCE_RESIST, me->GetGUID()))
-                        {
                             DoCast(victim, SPELL_SHADOW_RESONANCE_RESIST);
-                            me->ClearUnitState(UNIT_STATE_CASTING);
-                        }
                         else
                             MoveInLineOfSight(me->GetVictim());
                     }
@@ -1147,7 +1143,6 @@ class npc_dark_nucleus : public CreatureScript
                 }
 
                 DoCast(who, SPELL_SHADOW_RESONANCE_RESIST);
-                me->ClearUnitState(UNIT_STATE_CASTING);
             }
 
             void DamageTaken(Unit* attacker, uint32& /*damage*/) override
@@ -1155,8 +1150,8 @@ class npc_dark_nucleus : public CreatureScript
                 if (attacker == me)
                     return;
 
-                me->DeleteThreatList();
-                me->AddThreat(attacker, 500000000.0f);
+                me->GetThreatManager().ClearAllThreat();
+                AddThreat(attacker, 500000000.0f);
             }
 
             void UpdateAI(uint32 diff) override
@@ -1477,7 +1472,7 @@ class spell_blood_council_shadow_prison : public SpellScriptLoader
             void HandleDummyTick(AuraEffect const* aurEff)
             {
                 if (GetTarget()->isMoving())
-                    GetTarget()->CastSpell(GetTarget(), SPELL_SHADOW_PRISON_DAMAGE, true, nullptr, aurEff);
+                    GetTarget()->CastSpell(GetTarget(), SPELL_SHADOW_PRISON_DAMAGE, aurEff);
             }
 
             void Register() override

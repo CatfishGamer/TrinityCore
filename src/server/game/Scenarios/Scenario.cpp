@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -57,7 +57,7 @@ void Scenario::CompleteStep(ScenarioStepEntry const* step)
     if (Quest const* quest = sObjectMgr->GetQuestTemplate(step->RewardQuestID))
         for (ObjectGuid guid : _players)
             if (Player* player = ObjectAccessor::FindPlayer(guid))
-                player->RewardQuest(quest, 0, nullptr, false);
+                player->RewardQuest(quest, LootItemType::Item, 0, nullptr, false);
 
     if (step->IsBonusObjective())
         return;
@@ -124,6 +124,11 @@ bool Scenario::IsComplete()
     return true;
 }
 
+ScenarioEntry const* Scenario::GetEntry() const
+{
+    return _data->Entry;
+}
+
 ScenarioStepState Scenario::GetStepState(ScenarioStepEntry const* step)
 {
     std::map<ScenarioStepEntry const*, ScenarioStepState>::const_iterator itr = _stepStates.find(step);
@@ -133,7 +138,7 @@ ScenarioStepState Scenario::GetStepState(ScenarioStepEntry const* step)
     return itr->second;
 }
 
-void Scenario::SendCriteriaUpdate(Criteria const * criteria, CriteriaProgress const * progress, uint32 timeElapsed, bool timedCompleted) const
+void Scenario::SendCriteriaUpdate(Criteria const * criteria, CriteriaProgress const * progress, Seconds timeElapsed, bool timedCompleted) const
 {
     WorldPackets::Scenario::ScenarioProgressUpdate progressUpdate;
     progressUpdate.CriteriaProgress.Id = criteria->ID;
@@ -144,7 +149,7 @@ void Scenario::SendCriteriaUpdate(Criteria const * criteria, CriteriaProgress co
         progressUpdate.CriteriaProgress.Flags = timedCompleted ? 1 : 0;
 
     progressUpdate.CriteriaProgress.TimeFromStart = timeElapsed;
-    progressUpdate.CriteriaProgress.TimeFromCreate = 0;
+    progressUpdate.CriteriaProgress.TimeFromCreate = Seconds::zero();
 
     SendPacket(progressUpdate.Write());
 }
@@ -300,14 +305,14 @@ std::vector<WorldPackets::Achievement::CriteriaProgress> Scenario::GetCriteriasP
     return criteriasProgress;
 }
 
-CriteriaList const& Scenario::GetCriteriaByType(CriteriaTypes type) const
+CriteriaList const& Scenario::GetCriteriaByType(CriteriaTypes type, uint32 /*asset*/) const
 {
     return sCriteriaMgr->GetScenarioCriteriaByType(type);
 }
 
 void Scenario::SendBootPlayer(Player* player)
 {
-    WorldPackets::Scenario::ScenarioBoot scenarioBoot;
+    WorldPackets::Scenario::ScenarioVacate scenarioBoot;
     scenarioBoot.ScenarioID = _data->Entry->ID;
     player->SendDirectMessage(scenarioBoot.Write());
 }

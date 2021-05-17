@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -148,8 +148,7 @@ struct TC_GAME_API CalendarInvite
             _note = calendarInvite.GetNote();
         }
 
-        CalendarInvite() : _inviteId(1), _eventId(0), _invitee(), _senderGUID(), _responseTime(0),
-            _status(CALENDAR_STATUS_INVITED), _rank(CALENDAR_RANK_PLAYER), _note("") { }
+        CalendarInvite();
 
         CalendarInvite(uint64 inviteId, uint64 eventId, ObjectGuid invitee, ObjectGuid senderGUID, time_t responseTime,
             CalendarInviteStatus status, CalendarModerationRank rank, std::string note) :
@@ -313,10 +312,10 @@ class TC_GAME_API CalendarMgr
         void UpdateEvent(CalendarEvent* calendarEvent);
 
         void AddInvite(CalendarEvent* calendarEvent, CalendarInvite* invite);
-        void AddInvite(CalendarEvent* calendarEvent, CalendarInvite* invite, SQLTransaction& trans);
+        void AddInvite(CalendarEvent* calendarEvent, CalendarInvite* invite, CharacterDatabaseTransaction& trans);
         void RemoveInvite(uint64 inviteId, uint64 eventId, ObjectGuid remover);
         void UpdateInvite(CalendarInvite* invite);
-        void UpdateInvite(CalendarInvite* invite, SQLTransaction& trans);
+        void UpdateInvite(CalendarInvite* invite, CharacterDatabaseTransaction& trans);
 
         void RemoveAllPlayerEventsAndInvites(ObjectGuid guid);
         void RemovePlayerGuildEventsAndSignups(ObjectGuid guid, ObjectGuid::LowType guildId);
@@ -331,7 +330,7 @@ class TC_GAME_API CalendarMgr
         void SendCalendarEventRemovedAlert(CalendarEvent const& calendarEvent);
         void SendCalendarEventModeratorStatusAlert(CalendarEvent const& calendarEvent, CalendarInvite const& invite);
         void SendCalendarClearPendingAction(ObjectGuid guid);
-        void SendCalendarCommandResult(ObjectGuid guid, CalendarError err, char const* param = NULL);
+        void SendCalendarCommandResult(ObjectGuid guid, CalendarError err, char const* param = nullptr);
 
         void SendPacketToAllEventRelatives(WorldPacket const* packet, CalendarEvent const& calendarEvent);
 };

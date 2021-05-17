@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -100,7 +100,7 @@ public:
 
         void DamageTaken(Unit* /*pAttacker*/, uint32 &damage) override
         {
-            if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE))
+            if (me->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE))
                 damage = 0;
 
             if ((GetHealthPct(0) >= 66 && GetHealthPct(damage) < 66)||
@@ -111,7 +111,7 @@ public:
             }
         }
 
-        void SpellHitTarget(Unit* target, const SpellInfo* spell) override
+        void SpellHitTarget(Unit* target, SpellInfo const* spell) override
         {
             if (spell->Id == SPELL_INSANITY)
             {
@@ -124,19 +124,19 @@ public:
                     // Channel visual
                     DoCast(me, INSANITY_VISUAL, true);
                     // Unattackable
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                     me->SetControlled(true, UNIT_STATE_STUNNED);
                 }
 
                 // phase the player
                 target->CastSpell(target, SPELL_INSANITY_TARGET + insanityHandled, true);
 
-                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_INSANITY_TARGET + insanityHandled);
+                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_INSANITY_TARGET + insanityHandled, GetDifficulty());
                 if (!spellInfo)
                     return;
 
                 // summon twisted party members for this target
-                Map::PlayerList const &players = me->GetMap()->GetPlayers();
+                Map::PlayerList const& players = me->GetMap()->GetPlayers();
                 for (Map::PlayerList::const_iterator i = players.begin(); i != players.end(); ++i)
                 {
                     Player* player = i->GetSource();
@@ -157,7 +157,7 @@ public:
 
         void ResetPlayersPhase()
         {
-            Map::PlayerList const &players = me->GetMap()->GetPlayers();
+            Map::PlayerList const& players = me->GetMap()->GetPlayers();
             for (Map::PlayerList::const_iterator i = players.begin(); i != players.end(); ++i)
             {
                 Player* player = i->GetSource();
@@ -182,11 +182,11 @@ public:
 
             // Cleanup
             Summons.DespawnAll();
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             me->SetControlled(false, UNIT_STATE_STUNNED);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
@@ -245,7 +245,7 @@ public:
                     return;
 
                 insanityHandled = 0;
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                 me->SetControlled(false, UNIT_STATE_STUNNED);
                 me->RemoveAurasDueToSpell(INSANITY_VISUAL);
             }

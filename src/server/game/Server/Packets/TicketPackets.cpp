@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -39,13 +39,13 @@ WorldPacket const* WorldPackets::Ticket::GMTicketCaseStatus::Write()
 {
     _worldPacket << int32(Cases.size());
 
-    for (auto const& c : Cases)
+    for (GMTicketCase const& c : Cases)
     {
         _worldPacket << int32(c.CaseID);
-        _worldPacket << int32(c.CaseOpened);
+        _worldPacket << c.CaseOpened;
         _worldPacket << int32(c.CaseStatus);
-        _worldPacket << int16(c.CfgRealmID);
-        _worldPacket << int64(c.CharacterID);
+        _worldPacket << uint16(c.CfgRealmID);
+        _worldPacket << uint64(c.CharacterID);
         _worldPacket << int32(c.WaitTimeOverrideMinutes);
 
         _worldPacket.WriteBits(c.Url.size(), 11);
@@ -64,25 +64,19 @@ void WorldPackets::Ticket::GMTicketAcknowledgeSurvey::Read()
     _worldPacket >> CaseID;
 }
 
-void WorldPackets::Ticket::SupportTicketSubmitBug::Read()
+void WorldPackets::Ticket::SubmitUserFeedback::Read()
 {
     _worldPacket >> Header;
-    Note = _worldPacket.ReadString(_worldPacket.ReadBits(10));
+    uint32 noteLength = _worldPacket.ReadBits(24);
+    IsSuggestion = _worldPacket.ReadBit();
+    if (noteLength)
+    {
+        Note = _worldPacket.ReadString(noteLength - 1);
+        _worldPacket.read_skip<char>(); // null terminator
+    }
 }
 
-void WorldPackets::Ticket::SupportTicketSubmitSuggestion::Read()
-{
-    _worldPacket >> Header;
-    Note = _worldPacket.ReadString(_worldPacket.ReadBits(10));
-}
-
-WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketChatLine::SupportTicketChatLine(ByteBuffer& data)
-{
-    data >> Timestamp;
-    Text = data.ReadString(data.ReadBits(12));
-}
-
-WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketChatLine::SupportTicketChatLine(uint32 timestamp, std::string const& text) :
+WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketChatLine::SupportTicketChatLine(time_t timestamp, std::string const& text) :
     Timestamp(timestamp), Text(text)
 { }
 
@@ -92,6 +86,11 @@ ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::SupportTicketSubm
     line.Text = data.ReadString(data.ReadBits(12));
 
     return data;
+}
+
+WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketChatLine::SupportTicketChatLine(ByteBuffer& data)
+{
+    data >> *this;
 }
 
 ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketChatLog& chatlog)
@@ -105,6 +104,58 @@ ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::SupportTicketSubm
 
     if (hasReportLineIndex)
         chatlog.ReportLineIndex = data.read<uint32>();
+
+    return data;
+}
+
+ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketHorusChatLine& line)
+{
+    data >> line.Timestamp;
+    data >> line.AuthorGUID;
+
+    bool hasClubID = data.ReadBit();
+    bool hasChannelGUID = data.ReadBit();
+    bool hasRealmAddress = data.ReadBit();
+    bool hasSlashCmd = data.ReadBit();
+    uint32 textLength = data.ReadBits(12);
+
+    if (hasClubID)
+        line.ClubID = data.read<uint64>();
+
+    if (hasChannelGUID)
+    {
+        line.ChannelGUID = boost::in_place();
+        data >> *line.ChannelGUID;
+    }
+
+    if (hasRealmAddress)
+    {
+        line.RealmAddress = boost::in_place();
+        data >> line.RealmAddress->VirtualRealmAddress;
+        data >> line.RealmAddress->field_4;
+        data >> line.RealmAddress->field_6;
+    }
+
+    if (hasSlashCmd)
+        line.SlashCmd = data.read<int32>();
+
+    line.Text = data.ReadString(textLength);
+
+    return data;
+}
+
+WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketHorusChatLine::SupportTicketHorusChatLine(ByteBuffer& data)
+{
+    data >> *this;
+}
+
+ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketHorusChatLog& chatlog)
+{
+    uint32 linesCount = data.read<uint32>();
+    data.ResetBitPos();
+
+    for (uint32 i = 0; i < linesCount; i++)
+        chatlog.Lines.emplace_back(data);
 
     return data;
 }
@@ -187,6 +238,18 @@ ByteBuffer& operator>>(ByteBuffer& data, Optional<WorldPackets::Ticket::SupportT
     return data;
 }
 
+ByteBuffer& operator>>(ByteBuffer& data, Optional<WorldPackets::Ticket::SupportTicketSubmitComplaint::SupportTicketClubFinderResult>& clubInfo)
+{
+    clubInfo = boost::in_place();
+
+    data >> clubInfo->ClubFinderPostingID;
+    data >> clubInfo->ClubID;
+    data >> clubInfo->ClubFinderGUID;
+    clubInfo->ClubName = data.ReadString(data.ReadBits(12));
+
+    return data;
+}
+
 void WorldPackets::Ticket::SupportTicketSubmitComplaint::Read()
 {
     _worldPacket >> Header;
@@ -202,6 +265,7 @@ void WorldPackets::Ticket::SupportTicketSubmitComplaint::Read()
     bool hasLFGListSearchResult = _worldPacket.ReadBit();
     bool hasLFGListApplicant = _worldPacket.ReadBit();
     bool hasClubMessage = _worldPacket.ReadBit();
+    bool hasClubFinderResult = _worldPacket.ReadBit();
 
     _worldPacket.ResetBitPos();
 
@@ -212,10 +276,12 @@ void WorldPackets::Ticket::SupportTicketSubmitComplaint::Read()
         _worldPacket.ResetBitPos();
     }
 
-    if (hasMailInfo)
-        _worldPacket >> MailInfo;
+    _worldPacket >> HorusChatLog;
 
     Note = _worldPacket.ReadString(noteLength);
+
+    if (hasMailInfo)
+        _worldPacket >> MailInfo;
 
     if (hasCalendarInfo)
         _worldPacket >> CalenderInfo;
@@ -231,6 +297,9 @@ void WorldPackets::Ticket::SupportTicketSubmitComplaint::Read()
 
     if (hasLFGListApplicant)
         _worldPacket >> LFGListApplicant;
+
+    if (hasClubFinderResult)
+        _worldPacket >> ClubFinderResult;
 }
 
 ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Ticket::Complaint::ComplaintOffender& complaintOffender)

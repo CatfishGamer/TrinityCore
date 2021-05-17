@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -170,7 +170,7 @@ class boss_corborus : public CreatureScript
                             // Face Corborus to players and set new home position
                             me->SetFacingTo(3.176499f);
                             me->SetHomePosition(1154.55f, 878.843f, 284.963f, 3.176499f);
-                            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC);
+                            me->RemoveUnitFlag(UNIT_FLAG_IMMUNE_TO_PC);
 
                             // Despawn Millhouse and all trash
                             instance->SetData(DATA_MILLHOUSE_EVENT_DESPAWN, 0);
@@ -192,7 +192,7 @@ class boss_corborus : public CreatureScript
                             events.RescheduleEvent(EVENT_SUBMERGE, 100000);
 
                             me->SetReactState(REACT_PASSIVE);
-                            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                            me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                             DoCast(me, SPELL_CLEAR_ALL_DEBUFFS);
                             me->AttackStop();
 
@@ -217,7 +217,7 @@ class boss_corborus : public CreatureScript
                             break;
                         case EVENT_EMERGE:
                             me->RemoveAllAuras();
-                            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                            me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                             DoCast(me, SPELL_EMERGE);
                             events.ScheduleEvent(EVENT_ATTACK, 2500);
                             break;
@@ -267,13 +267,13 @@ class npc_rock_borer : public CreatureScript
             {
                 me->SetDisableGravity(true);
                 me->SetReactState(REACT_PASSIVE);
-                events.ScheduleEvent(EVENT_EMERGED, 1200);
-                events.ScheduleEvent(EVENT_ROCK_BORE, urand(15000, 20000)); // Need sniffs for this timer
             }
 
-            void IsSummonedBy(Unit* summoner) override
+            void IsSummonedBy(Unit* /*summoner*/) override
             {
-                me->SetInCombatState(false, summoner);
+                events.ScheduleEvent(EVENT_EMERGED, 1200);
+                events.ScheduleEvent(EVENT_ROCK_BORE, urand(15000, 20000)); // Need sniffs for this timer
+                DoZoneInCombat();
                 DoCast(me, SPELL_ROCK_BORER_EMERGE);
             }
 

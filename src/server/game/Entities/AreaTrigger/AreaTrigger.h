@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -44,6 +44,15 @@ class TC_GAME_API AreaTrigger : public WorldObject, public GridObject<AreaTrigge
         AreaTrigger();
         ~AreaTrigger();
 
+    protected:
+        void BuildValuesCreate(ByteBuffer* data, Player const* target) const override;
+        void BuildValuesUpdate(ByteBuffer* data, Player const* target) const override;
+        void ClearUpdateMask(bool remove) override;
+
+    public:
+        void BuildValuesUpdateForPlayerWithMask(UpdateData* data, UF::ObjectData::Mask const& requestedObjectMask,
+            UF::AreaTriggerData::Mask const& requestedAreaTriggerMask, Player const* target) const;
+
         void AddToWorld() override;
         void RemoveFromWorld() override;
 
@@ -52,19 +61,26 @@ class TC_GAME_API AreaTrigger : public WorldObject, public GridObject<AreaTrigge
 
         AreaTriggerAI* AI() { return _ai.get(); }
 
+        bool IsServerSide() const { return _areaTriggerTemplate->Id.IsServerSide; }
+
+        bool IsNeverVisibleFor(WorldObject const* /*seer*/) const override { return IsServerSide(); }
+
     private:
-        bool Create(uint32 spellMiscId, Unit* caster, Unit* target, SpellInfo const* spell, Position const& pos, int32 duration, uint32 spellXSpellVisualId, ObjectGuid const& castId, AuraEffect const* aurEff);
+        bool Create(uint32 spellMiscId, Unit* caster, Unit* target, SpellInfo const* spell, Position const& pos, int32 duration, SpellCastVisual spellVisual, ObjectGuid const& castId, AuraEffect const* aurEff);
+        bool CreateServer(Map* map, AreaTriggerTemplate const* areaTriggerTemplate, AreaTriggerSpawn const& position);
+
     public:
-        static AreaTrigger* CreateAreaTrigger(uint32 spellMiscId, Unit* caster, Unit* target, SpellInfo const* spell, Position const& pos, int32 duration, uint32 spellXSpellVisualId, ObjectGuid const& castId = ObjectGuid::Empty, AuraEffect const* aurEff = nullptr);
+        static AreaTrigger* CreateAreaTrigger(uint32 spellMiscId, Unit* caster, Unit* target, SpellInfo const* spell, Position const& pos, int32 duration, SpellCastVisual spellVisual, ObjectGuid const& castId = ObjectGuid::Empty, AuraEffect const* aurEff = nullptr);
+        bool LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate);
 
         void Update(uint32 diff) override;
         void Remove();
         bool IsRemoved() const { return _isRemoved; }
-        uint32 GetSpellId() const { return GetUInt32Value(AREATRIGGER_SPELLID); }
+        uint32 GetSpellId() const { return m_areaTriggerData->SpellID; }
         AuraEffect const* GetAuraEffect() const { return _aurEff; }
         uint32 GetTimeSinceCreated() const { return _timeSinceCreated; }
-        uint32 GetTimeToTarget() const { return GetUInt32Value(AREATRIGGER_TIME_TO_TARGET); }
-        uint32 GetTimeToTargetScale() const { return GetUInt32Value(AREATRIGGER_TIME_TO_TARGET_SCALE); }
+        uint32 GetTimeToTarget() const { return m_areaTriggerData->TimeToTarget; }
+        uint32 GetTimeToTargetScale() const { return m_areaTriggerData->TimeToTargetScale; }
         int32 GetDuration() const { return _duration; }
         int32 GetTotalDuration() const { return _totalDuration; }
         void SetDuration(int32 newDuration);
@@ -76,7 +92,7 @@ class TC_GAME_API AreaTrigger : public WorldObject, public GridObject<AreaTrigge
         AreaTriggerTemplate const* GetTemplate() const;
         uint32 GetScriptId() const;
 
-        ObjectGuid const& GetCasterGuid() const { return GetGuidValue(AREATRIGGER_CASTER); }
+        ObjectGuid const& GetCasterGuid() const { return m_areaTriggerData->Caster; }
         Unit* GetCaster() const;
         Unit* GetTarget() const;
 
@@ -88,33 +104,37 @@ class TC_GAME_API AreaTrigger : public WorldObject, public GridObject<AreaTrigge
         ::Movement::Spline<int32> const& GetSpline() const { return *_spline; }
         uint32 GetElapsedTimeForMovement() const { return GetTimeSinceCreated(); } /// @todo: research the right value, in sniffs both timers are nearly identical
 
-        void InitCircularMovement(AreaTriggerCircularMovementInfo const& cmi, uint32 timeToTarget);
-        bool HasCircularMovement() const;
-        Optional<AreaTriggerCircularMovementInfo> const& GetCircularMovementInfo() const { return _circularMovementInfo; }
+        void InitOrbit(AreaTriggerOrbitInfo const& cmi, uint32 timeToTarget);
+        bool HasOrbit() const;
+        Optional<AreaTriggerOrbitInfo> const& GetCircularMovementInfo() const { return _orbitInfo; }
 
         void UpdateShape();
+
+        UF::UpdateField<UF::AreaTriggerData, 0, TYPEID_AREATRIGGER> m_areaTriggerData;
+
 
     protected:
         void _UpdateDuration(int32 newDuration);
         float GetProgress() const;
 
         void UpdateTargetList();
-        void SearchUnitInSphere(std::list<Unit*>& targetList);
-        void SearchUnitInBox(std::list<Unit*>& targetList);
-        void SearchUnitInPolygon(std::list<Unit*>& targetList);
-        void SearchUnitInCylinder(std::list<Unit*>& targetList);
+        void SearchUnits(std::vector<Unit*>& targetList, float radius, bool check3D);
+        void SearchUnitInSphere(std::vector<Unit*>& targetList);
+        void SearchUnitInBox(std::vector<Unit*>& targetList);
+        void SearchUnitInPolygon(std::vector<Unit*>& targetList);
+        void SearchUnitInCylinder(std::vector<Unit*>& targetList);
         bool CheckIsInPolygon2D(Position const* pos) const;
-        void HandleUnitEnterExit(std::list<Unit*> const& targetList);
+        void HandleUnitEnterExit(std::vector<Unit*> const& targetList);
 
         void DoActions(Unit* unit);
         void UndoActions(Unit* unit);
 
         void UpdatePolygonOrientation();
-        void UpdateCircularMovementPosition(uint32 diff);
+        void UpdateOrbitPosition(uint32 diff);
         void UpdateSplinePosition(uint32 diff);
 
-        Position const* GetCircularMovementCenterPosition() const;
-        Position CalculateCircularMovementPosition() const;
+        Position const* GetOrbitCenterPosition() const;
+        Position CalculateOrbitPosition() const;
 
         void DebugVisualizePosition(); // Debug purpose only
 
@@ -137,9 +157,10 @@ class TC_GAME_API AreaTrigger : public WorldObject, public GridObject<AreaTrigge
         int32 _lastSplineIndex;
         uint32 _movementTime;
 
-        Optional<AreaTriggerCircularMovementInfo> _circularMovementInfo;
+        Optional<AreaTriggerOrbitInfo> _orbitInfo;
 
         AreaTriggerMiscTemplate const* _areaTriggerMiscTemplate;
+        AreaTriggerTemplate const* _areaTriggerTemplate;
         GuidUnorderedSet _insideUnits;
 
         std::unique_ptr<AreaTriggerAI> _ai;

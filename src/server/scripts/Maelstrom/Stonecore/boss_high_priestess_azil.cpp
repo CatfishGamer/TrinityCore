@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -150,9 +150,9 @@ class boss_high_priestess_azil : public CreatureScript
                 events.ScheduleEvent(EVENT_SUMMON_WAVE_WEST, 40000);
             }
 
-            void EnterCombat(Unit* /*victim*/) override
+            void JustEngagedWith(Unit* /*victim*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
 
                 DoCast(me, SPELL_ENERGY_SHIELD);
                 Talk(SAY_AGGRO);
@@ -323,7 +323,7 @@ public:
 
             if (Unit* target = me->SelectNearestPlayer(200.0f))
             {
-                me->AddThreat(target, 0.0f);
+                AddThreat(target, 0.0f);
                 me->SetInCombatWith(target);
                 target->SetInCombatWith(me);
                 DoStartMovement(target);
@@ -697,8 +697,8 @@ public:
                 return;
 
             target->ExitVehicle();
-            DynamicObject* dynamicObject = GetCaster()->GetDynObject(SPELL_SEISMIC_SHARD_TARGETING);
-            target->CastSpell(dynamicObject->GetPositionX(), dynamicObject->GetPositionY(), dynamicObject->GetPositionZ(), SPELL_SEISMIC_SHARD_MISSLE, true);
+            if (DynamicObject* dynamicObject = GetCaster()->GetDynObject(SPELL_SEISMIC_SHARD_TARGETING))
+                target->CastSpell(dynamicObject->GetPosition(), SPELL_SEISMIC_SHARD_MISSLE, true);
         }
 
         void Register() override

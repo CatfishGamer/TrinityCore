@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,6 +18,7 @@
 #include "InstanceScenario.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
+#include "GameTime.h"
 #include "InstanceSaveMgr.h"
 #include "Log.h"
 #include "Map.h"
@@ -51,7 +52,7 @@ void InstanceScenario::SaveToDB()
         return;
     }
 
-    SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
     for (auto iter = _criteriaProgress.begin(); iter != _criteriaProgress.end(); ++iter)
     {
         if (!iter->second.Changed)
@@ -69,7 +70,7 @@ void InstanceScenario::SaveToDB()
 
         if (iter->second.Counter)
         {
-            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_SCENARIO_INSTANCE_CRITERIA);
+            CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_SCENARIO_INSTANCE_CRITERIA);
             stmt->setUInt32(0, id);
             stmt->setUInt32(1, iter->first);
             trans->Append(stmt);
@@ -78,7 +79,7 @@ void InstanceScenario::SaveToDB()
             stmt->setUInt32(0, id);
             stmt->setUInt32(1, iter->first);
             stmt->setUInt64(2, iter->second.Counter);
-            stmt->setUInt32(3, uint32(iter->second.Date));
+            stmt->setInt64(3, iter->second.Date);
             trans->Append(stmt);
         }
 
@@ -90,14 +91,14 @@ void InstanceScenario::SaveToDB()
 
 void InstanceScenario::LoadInstanceData(uint32 instanceId)
 {
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_SCENARIO_INSTANCE_CRITERIA_FOR_INSTANCE);
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_SCENARIO_INSTANCE_CRITERIA_FOR_INSTANCE);
     stmt->setUInt32(0, instanceId);
 
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (result)
     {
-        SQLTransaction trans = CharacterDatabase.BeginTransaction();
-        time_t now = time(nullptr);
+        CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        time_t now = GameTime::GetGameTime();
 
         std::vector<CriteriaTree const*> criteriaTrees;
         do
@@ -105,7 +106,7 @@ void InstanceScenario::LoadInstanceData(uint32 instanceId)
             Field* fields = result->Fetch();
             uint32 id = fields[0].GetUInt32();
             uint64 counter = fields[1].GetUInt64();
-            time_t date = time_t(fields[2].GetUInt32());
+            time_t date = fields[2].GetInt64();
 
             Criteria const* criteria = sCriteriaMgr->GetCriteria(id);
             if (!criteria)

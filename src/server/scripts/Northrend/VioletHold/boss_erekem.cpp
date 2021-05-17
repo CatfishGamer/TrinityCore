@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -68,9 +68,9 @@ class boss_erekem : public CreatureScript
                 me->SetCanDualWield(false);
             }
 
-            void EnterCombat(Unit* who) override
+            void JustEngagedWith(Unit* who) override
             {
-                BossAI::EnterCombat(who);
+                BossAI::JustEngagedWith(who);
                 Talk(SAY_AGGRO);
                 DoCast(me, SPELL_EARTH_SHIELD);
             }
@@ -78,7 +78,7 @@ class boss_erekem : public CreatureScript
             void MovementInform(uint32 type, uint32 pointId) override
             {
                 if (type == EFFECT_MOTION_TYPE && pointId == POINT_INTRO)
-                    me->SetFacingTo(4.921828f, true);
+                    me->SetFacingTo(4.921828f);
             }
 
             void JustReachedHome() override
@@ -271,7 +271,7 @@ class npc_erekem_guard : public CreatureScript
                 scheduler.CancelAll();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
                 DoZoneInCombat();
             }

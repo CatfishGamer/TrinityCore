@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -48,12 +48,12 @@ public:
         };
         static std::vector<ChatCommand> commandTable =
         {
-            { "quest", rbac::RBAC_PERM_COMMAND_QUEST,  false, NULL, "", questCommandTable },
+            { "quest", rbac::RBAC_PERM_COMMAND_QUEST,  false, nullptr, "", questCommandTable },
         };
         return commandTable;
     }
 
-    static bool HandleQuestAdd(ChatHandler* handler, const char* args)
+    static bool HandleQuestAdd(ChatHandler* handler, char const* args)
     {
         Player* player = handler->getSelectedPlayerOrSelf();
         if (!player)
@@ -96,12 +96,12 @@ public:
 
         // ok, normal (creature/GO starting) quest
         if (player->CanAddQuest(quest, true))
-            player->AddQuestAndCheckCompletion(quest, NULL);
+            player->AddQuestAndCheckCompletion(quest, nullptr);
 
         return true;
     }
 
-    static bool HandleQuestRemove(ChatHandler* handler, const char* args)
+    static bool HandleQuestRemove(ChatHandler* handler, char const* args)
     {
         Player* player = handler->getSelectedPlayer();
         if (!player)
@@ -130,36 +130,44 @@ public:
 
         QuestStatus oldStatus = player->GetQuestStatus(entry);
 
-        // remove all quest entries for 'entry' from quest log
-        for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+        if (player->GetQuestStatus(entry) != QUEST_STATUS_NONE)
         {
-            uint32 logQuest = player->GetQuestSlotQuestId(slot);
-            if (logQuest == entry)
+            // remove all quest entries for 'entry' from quest log
+            for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
             {
-                player->SetQuestSlot(slot, 0);
-
-                // we ignore unequippable quest items in this case, its' still be equipped
-                player->TakeQuestSourceItem(logQuest, false);
-
-                if (quest->HasFlag(QUEST_FLAGS_FLAGS_PVP))
+                uint32 logQuest = player->GetQuestSlotQuestId(slot);
+                if (logQuest == entry)
                 {
-                    player->pvpInfo.IsHostile = player->pvpInfo.IsInHostileArea || player->HasPvPForcingQuest();
-                    player->UpdatePvPState();
+                    player->SetQuestSlot(slot, 0);
+
+                    // we ignore unequippable quest items in this case, its' still be equipped
+                    player->TakeQuestSourceItem(logQuest, false);
+
+                    if (quest->HasFlag(QUEST_FLAGS_FLAGS_PVP))
+                    {
+                        player->pvpInfo.IsHostile = player->pvpInfo.IsInHostileArea || player->HasPvPForcingQuest();
+                        player->UpdatePvPState();
+                    }
                 }
             }
+            player->RemoveActiveQuest(entry, false);
+            player->RemoveRewardedQuest(entry);
+
+            sScriptMgr->OnQuestStatusChange(player, entry);
+            sScriptMgr->OnQuestStatusChange(player, quest, oldStatus, QUEST_STATUS_NONE);
+
+            handler->SendSysMessage(LANG_COMMAND_QUEST_REMOVED);
+            return true;
         }
-
-        player->RemoveActiveQuest(entry, false);
-        player->RemoveRewardedQuest(entry);
-
-        sScriptMgr->OnQuestStatusChange(player, entry);
-        sScriptMgr->OnQuestStatusChange(player, quest, oldStatus, QUEST_STATUS_NONE);
-
-        handler->SendSysMessage(LANG_COMMAND_QUEST_REMOVED);
-        return true;
+        else
+        {
+            handler->SendSysMessage(LANG_COMMAND_QUEST_NOTFOUND);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
     }
 
-    static bool HandleQuestComplete(ChatHandler* handler, const char* args)
+    static bool HandleQuestComplete(ChatHandler* handler, char const* args)
     {
         Player* player = handler->getSelectedPlayerOrSelf();
         if (!player)
@@ -245,7 +253,7 @@ public:
         if (sWorld->getBoolConfig(CONFIG_QUEST_ENABLE_QUEST_TRACKER)) // check if Quest Tracker is enabled
         {
             // prepare Quest Tracker datas
-            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_QUEST_TRACK_GM_COMPLETE);
+            CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_QUEST_TRACK_GM_COMPLETE);
             stmt->setUInt32(0, quest->GetQuestId());
             stmt->setUInt64(1, player->GetGUID().GetCounter());
 
@@ -285,7 +293,7 @@ public:
             return false;
         }
 
-        player->RewardQuest(quest, 0, player);
+        player->RewardQuest(quest, LootItemType::Item, 0, player);
         return true;
     }
 };

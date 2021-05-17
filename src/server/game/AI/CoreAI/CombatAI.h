@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,7 +28,7 @@ class TC_GAME_API AggressorAI : public CreatureAI
         explicit AggressorAI(Creature* c) : CreatureAI(c) { }
 
         void UpdateAI(uint32) override;
-        static int Permissible(const Creature*);
+        static int32 Permissible(Creature const* creature);
 };
 
 typedef std::vector<uint32> SpellVct;
@@ -41,12 +40,12 @@ class TC_GAME_API CombatAI : public CreatureAI
 
         void InitializeAI() override;
         void Reset() override;
-        void EnterCombat(Unit* who) override;
+        void JustEngagedWith(Unit* who) override;
         void JustDied(Unit* killer) override;
         void UpdateAI(uint32 diff) override;
         void SpellInterrupted(uint32 spellId, uint32 unTimeMs) override;
 
-        static int Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
+        static int32 Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
 
     protected:
         EventMap events;
@@ -60,7 +59,7 @@ class TC_GAME_API CasterAI : public CombatAI
         void InitializeAI() override;
         void AttackStart(Unit* victim) override { AttackStartCaster(victim, m_attackDist); }
         void UpdateAI(uint32 diff) override;
-        void EnterCombat(Unit* /*who*/) override;
+        void JustEngagedWith(Unit* /*who*/) override;
     private:
         float m_attackDist;
 };
@@ -72,7 +71,7 @@ struct TC_GAME_API ArcherAI : public CreatureAI
         void AttackStart(Unit* who) override;
         void UpdateAI(uint32 diff) override;
 
-        static int Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
+        static int32 Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
 
     protected:
         float m_minRange;
@@ -86,7 +85,7 @@ struct TC_GAME_API TurretAI : public CreatureAI
         void AttackStart(Unit* who) override;
         void UpdateAI(uint32 diff) override;
 
-        static int Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
+        static int32 Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
 
     protected:
         float m_minRange;
@@ -105,7 +104,7 @@ struct TC_GAME_API VehicleAI : public CreatureAI
         void AttackStart(Unit*) override { }
         void OnCharmed(bool apply) override;
 
-        static int Permissible(Creature const* /*creature*/) { return PERMIT_BASE_NO; }
+        static int32 Permissible(Creature const* creature);
 
     private:
         void LoadConditions();

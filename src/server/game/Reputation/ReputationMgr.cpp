@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,12 +21,10 @@
 #include "DB2Stores.h"
 #include "Log.h"
 #include "ObjectMgr.h"
-#include "Opcodes.h"
 #include "Player.h"
 #include "ReputationPackets.h"
 #include "ScriptMgr.h"
 #include "World.h"
-#include "WorldPacket.h"
 #include "WorldSession.h"
 
 const int32 ReputationMgr::PointsInRank[MAX_REPUTATION_RANK] = {36000, 3000, 3000, 3000, 6000, 12000, 21000, 1000};
@@ -49,7 +46,7 @@ ReputationRank ReputationMgr::ReputationToRank(int32 standing)
 
 FactionState const* ReputationMgr::GetState(FactionEntry const* factionEntry) const
 {
-    return factionEntry->CanHaveReputation() ? GetState(factionEntry->ReputationIndex) : NULL;
+    return factionEntry->CanHaveReputation() ? GetState(factionEntry->ReputationIndex) : nullptr;
 }
 
 bool ReputationMgr::IsAtWar(uint32 faction_id) const
@@ -93,12 +90,12 @@ int32 ReputationMgr::GetBaseReputation(FactionEntry const* factionEntry) const
     if (!factionEntry)
         return 0;
 
-    uint64 raceMask = _player->getRaceMask();
+    uint8 race = _player->getRace();
     uint32 classMask = _player->getClassMask();
     for (int i=0; i < 4; i++)
     {
-        if ((factionEntry->ReputationRaceMask[i] & raceMask  ||
-            (factionEntry->ReputationRaceMask[i] == 0  &&
+        if ((factionEntry->ReputationRaceMask[i].HasRace(race) ||
+            (!factionEntry->ReputationRaceMask[i] &&
              factionEntry->ReputationClassMask[i] != 0)) &&
             (factionEntry->ReputationClassMask[i] & classMask ||
              factionEntry->ReputationClassMask[i] == 0))
@@ -152,12 +149,12 @@ uint32 ReputationMgr::GetDefaultStateFlags(FactionEntry const* factionEntry) con
     if (!factionEntry)
         return 0;
 
-    uint64 raceMask = _player->getRaceMask();
+    uint8 race = _player->getRace();
     uint32 classMask = _player->getClassMask();
     for (int i=0; i < 4; i++)
     {
-        if ((factionEntry->ReputationRaceMask[i] & raceMask  ||
-            (factionEntry->ReputationRaceMask[i] == 0  &&
+        if ((factionEntry->ReputationRaceMask[i].HasRace(race) ||
+            (!factionEntry->ReputationRaceMask[i] &&
              factionEntry->ReputationClassMask[i] != 0)) &&
             (factionEntry->ReputationClassMask[i] & classMask ||
              factionEntry->ReputationClassMask[i] == 0))
@@ -188,13 +185,16 @@ void ReputationMgr::SendState(FactionState const* faction)
     WorldPackets::Reputation::SetFactionStanding setFactionStanding;
     setFactionStanding.ReferAFriendBonus = 0.0f;
     setFactionStanding.BonusFromAchievementSystem = 0.0f;
-    setFactionStanding.Faction.emplace_back(int32(faction->ReputationListID), faction->Standing);
+
+    if (faction)
+        setFactionStanding.Faction.emplace_back(int32(faction->ReputationListID), faction->Standing);
+
     for (FactionStateList::iterator itr = _factions.begin(); itr != _factions.end(); ++itr)
     {
         if (itr->second.needSend)
         {
             itr->second.needSend = false;
-            if (itr->second.ReputationListID != faction->ReputationListID)
+            if (!faction || itr->second.ReputationListID != faction->ReputationListID)
                 setFactionStanding.Faction.emplace_back(int32(itr->second.ReputationListID), itr->second.Standing);
         }
     }
@@ -218,12 +218,6 @@ void ReputationMgr::SendInitialReputations()
     }
 
     _player->SendDirectMessage(initFactions.Write());
-}
-
-void ReputationMgr::SendStates()
-{
-    for (FactionStateList::iterator itr = _factions.begin(); itr != _factions.end(); ++itr)
-        SendState(&(itr->second));
 }
 
 void ReputationMgr::SendVisible(FactionState const* faction, bool visible) const
@@ -268,14 +262,14 @@ void ReputationMgr::Initialize()
     }
 }
 
-bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental, bool noSpillover)
+bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standing, bool incremental, bool spillOverOnly, bool noSpillover)
 {
     sScriptMgr->OnPlayerReputationChange(_player, factionEntry->ID, standing, incremental);
     bool res = false;
     if (!noSpillover)
     {
         // if spillover definition exists in DB, override DBC
-        if (const RepSpilloverTemplate* repTemplate = sObjectMgr->GetRepSpilloverTemplate(factionEntry->ID))
+        if (RepSpilloverTemplate const* repTemplate = sObjectMgr->GetRepSpilloverTemplate(factionEntry->ID))
         {
             for (uint32 i = 0; i < MAX_SPILLOVER_FACTIONS; ++i)
             {
@@ -335,7 +329,10 @@ bool ReputationMgr::SetReputation(FactionEntry const* factionEntry, int32 standi
     FactionStateList::iterator faction = _factions.find(factionEntry->ReputationIndex);
     if (faction != _factions.end())
     {
-        res = SetOneFactionReputation(factionEntry, standing, incremental);
+        // if we update spillover only, do not update main reputation (rank exceeds creature reward rate)
+        if (!spillOverOnly)
+            res = SetOneFactionReputation(factionEntry, standing, incremental);
+
         // only this faction gets reported to client, even if it has no own visible standing
         SendState(&faction->second);
     }
@@ -364,7 +361,11 @@ bool ReputationMgr::SetOneFactionReputation(FactionEntry const* factionEntry, in
         ReputationRank old_rank = ReputationToRank(itr->second.Standing + BaseRep);
         ReputationRank new_rank = ReputationToRank(standing);
 
-        itr->second.Standing = standing - BaseRep;
+        int32 newStanding = standing - BaseRep;
+
+        _player->ReputationChanged(factionEntry, newStanding - itr->second.Standing);
+
+        itr->second.Standing = newStanding;
         itr->second.needSend = true;
         itr->second.needSave = true;
 
@@ -378,7 +379,6 @@ bool ReputationMgr::SetOneFactionReputation(FactionEntry const* factionEntry, in
 
         UpdateRankCounters(old_rank, new_rank);
 
-        _player->ReputationChanged(factionEntry);
         _player->UpdateCriteria(CRITERIA_TYPE_KNOWN_FACTIONS,          factionEntry->ID);
         _player->UpdateCriteria(CRITERIA_TYPE_GAIN_REPUTATION,         factionEntry->ID);
         _player->UpdateCriteria(CRITERIA_TYPE_GAIN_EXALTED_REPUTATION, factionEntry->ID);
@@ -397,7 +397,7 @@ void ReputationMgr::SetVisible(FactionTemplateEntry const* factionTemplateEntry)
 
     if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(factionTemplateEntry->Faction))
         // Never show factions of the opposing team
-        if (!(factionEntry->ReputationRaceMask[1] & _player->getRaceMask() && factionEntry->ReputationBase[1] == Reputation_Bottom))
+        if (!(factionEntry->ReputationRaceMask[1].HasRace(_player->getRace()) && factionEntry->ReputationBase[1] == Reputation_Bottom))
             SetVisible(factionEntry);
 }
 
@@ -448,8 +448,8 @@ void ReputationMgr::SetAtWar(RepListID repListID, bool on)
 
 void ReputationMgr::SetAtWar(FactionState* faction, bool atWar) const
 {
-    // not allow declare war to own faction
-    if (atWar && (faction->Flags & FACTION_FLAG_PEACE_FORCED))
+    // Do not allow to declare war to our own faction. But allow for rival factions (eg Aldor vs Scryer).
+    if (atWar && (faction->Flags & FACTION_FLAG_PEACE_FORCED) && !(faction->Flags & FACTION_FLAG_RIVAL))
         return;
 
     // already set
@@ -553,13 +553,13 @@ void ReputationMgr::LoadFromDB(PreparedQueryResult result)
     }
 }
 
-void ReputationMgr::SaveToDB(SQLTransaction& trans)
+void ReputationMgr::SaveToDB(CharacterDatabaseTransaction& trans)
 {
     for (FactionStateList::iterator itr = _factions.begin(); itr != _factions.end(); ++itr)
     {
         if (itr->second.needSave)
         {
-            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_REPUTATION_BY_FACTION);
+            CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_REPUTATION_BY_FACTION);
             stmt->setUInt64(0, _player->GetGUID().GetCounter());
             stmt->setUInt16(1, uint16(itr->second.ID));
             trans->Append(stmt);

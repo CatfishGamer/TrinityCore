@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,6 +20,7 @@
 
 #include "Packet.h"
 #include "ObjectGuid.h"
+#include "PacketUtilities.h"
 
 namespace WorldPackets
 {
@@ -37,7 +38,7 @@ namespace WorldPackets
             ObjectGuid RequesterGuid;
             uint32 Id = 0;
             RideType Type = RideType::None;
-            int32 Time = 0;
+            Timestamp<> Time;
         };
     }
 }

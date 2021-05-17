@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,8 +23,8 @@ SDCategory: Scholomance
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "ScriptedCreature.h"
 #include "scholomance.h"
+#include "ScriptedCreature.h"
 
 enum Spells
 {
@@ -70,9 +70,9 @@ class boss_instructor_malicia : public CreatureScript
                 Initialize();
             }
 
-            void EnterCombat(Unit* /*who*/) override
+            void JustEngagedWith(Unit* /*who*/) override
             {
-                _EnterCombat();
+                _JustEngagedWith();
                 events.ScheduleEvent(EVENT_CALLOFGRAVES, 4000);
                 events.ScheduleEvent(EVENT_CORRUPTION, 8000);
                 events.ScheduleEvent(EVENT_RENEW, 32000);

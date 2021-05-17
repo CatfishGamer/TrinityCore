@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,7 +18,6 @@
 #include "ScriptMgr.h"
 #include "Creature.h"
 #include "CreatureAI.h"
-#include "EventMap.h"
 #include "GameObject.h"
 #include "InstanceScript.h"
 #include "Map.h"
@@ -90,7 +89,7 @@ class instance_oculus : public InstanceMapScript
                         BelgaristraszGUID = creature->GetGUID();
                         if (GetBossState(DATA_DRAKOS) == DONE)
                         {
-                            creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                            creature->AddNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                             creature->Relocate(BelgaristraszMove);
                         }
                         break;
@@ -98,7 +97,7 @@ class instance_oculus : public InstanceMapScript
                         EternosGUID = creature->GetGUID();
                         if (GetBossState(DATA_DRAKOS) == DONE)
                         {
-                            creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                            creature->AddNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                             creature->Relocate(EternosMove);
                         }
                         break;
@@ -106,7 +105,7 @@ class instance_oculus : public InstanceMapScript
                         VerdisaGUID = creature->GetGUID();
                         if (GetBossState(DATA_DRAKOS) == DONE)
                         {
-                            creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                            creature->AddNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                             creature->Relocate(VerdisaMove);
                         }
                         break;
@@ -123,26 +122,13 @@ class instance_oculus : public InstanceMapScript
 
             void OnGameObjectCreate(GameObject* go) override
             {
+                InstanceScript::OnGameObjectCreate(go);
+
                 switch (go->GetEntry())
                 {
-                    case GO_DRAGON_CAGE_DOOR:
-                        AddDoor(go, true);
-                        break;
                     case GO_EREGOS_CACHE_N:
                     case GO_EREGOS_CACHE_H:
                         EregosCacheGUID = go->GetGUID();
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            void OnGameObjectRemove(GameObject* go) override
-            {
-                switch (go->GetEntry())
-                {
-                    case GO_DRAGON_CAGE_DOOR:
-                        AddDoor(go, false);
                         break;
                     default:
                         break;
@@ -232,7 +218,7 @@ class instance_oculus : public InstanceMapScript
                             if (GameObject* cache = instance->GetGameObject(EregosCacheGUID))
                             {
                                 cache->SetRespawnTime(cache->GetRespawnDelay());
-                                cache->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                                cache->RemoveFlag(GO_FLAG_NOT_SELECTABLE);
                             }
                         }
                         break;
@@ -249,7 +235,7 @@ class instance_oculus : public InstanceMapScript
                         return KILL_NO_CONSTRUCT;
                     else if (CentrifugueConstructCounter == 1)
                         return KILL_ONE_CONSTRUCT;
-                    else if (CentrifugueConstructCounter > 1)
+                    else
                         return KILL_MORE_CONSTRUCT;
                 }
 

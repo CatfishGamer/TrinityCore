@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,8 +17,8 @@
 
 #include "ScriptMgr.h"
 #include "InstanceScript.h"
-#include "naxxramas.h"
 #include "ObjectAccessor.h"
+#include "naxxramas.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 
@@ -96,7 +96,7 @@ public:
 
         void InitializeAI() override
         {
-            if (!me->isDead())
+            if (!me->isDead() && instance->GetBossState(BOSS_ANUBREKHAN) != DONE)
             {
                 Reset();
                 SummonGuards();
@@ -143,7 +143,7 @@ public:
         void KilledUnit(Unit* victim) override
         {
             if (victim->GetTypeId() == TYPEID_PLAYER)
-                victim->CastSpell(victim, SPELL_SUMMON_CORPSE_SCARABS_PLR, true, nullptr, nullptr, me->GetGUID());
+                victim->CastSpell(victim, SPELL_SUMMON_CORPSE_SCARABS_PLR, me->GetGUID());
 
             Talk(SAY_SLAY);
         }
@@ -156,9 +156,9 @@ public:
             instance->DoStartCriteriaTimer(CRITERIA_TIMED_TYPE_EVENT, ACHIEV_TIMED_START_EVENT);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
-            _EnterCombat();
+            _JustEngagedWith();
             Talk(SAY_AGGRO);
 
             summons.DoZoneInCombat();
@@ -198,7 +198,7 @@ public:
                         {
                             if (Creature* creatureTarget = ObjectAccessor::GetCreature(*me, Trinity::Containers::SelectRandomContainerElement(guardCorpses)))
                             {
-                                creatureTarget->CastSpell(creatureTarget, SPELL_SUMMON_CORPSE_SCARABS_MOB, true, nullptr, nullptr, me->GetGUID());
+                                creatureTarget->CastSpell(creatureTarget, SPELL_SUMMON_CORPSE_SCARABS_MOB, me->GetGUID());
                                 creatureTarget->AI()->Talk(EMOTE_SCARAB);
                                 creatureTarget->DespawnOrUnsummon();
                             }
@@ -238,20 +238,19 @@ public:
 
 };
 
-class at_anubrekhan_entrance : public AreaTriggerScript
+class at_anubrekhan_entrance : public OnlyOnceAreaTriggerScript
 {
     public:
-        at_anubrekhan_entrance() : AreaTriggerScript("at_anubrekhan_entrance") { }
+        at_anubrekhan_entrance() : OnlyOnceAreaTriggerScript("at_anubrekhan_entrance") { }
 
-        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
+        bool _OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
         {
             InstanceScript* instance = player->GetInstanceScript();
-            if (!instance || instance->GetData(DATA_HAD_ANUBREKHAN_GREET) || instance->GetBossState(BOSS_ANUBREKHAN) != NOT_STARTED)
+            if (!instance || instance->GetBossState(BOSS_ANUBREKHAN) != NOT_STARTED)
                 return true;
 
             if (Creature* anub = ObjectAccessor::GetCreature(*player, instance->GetGuidData(DATA_ANUBREKHAN)))
                 anub->AI()->Talk(SAY_GREET);
-            instance->SetData(DATA_HAD_ANUBREKHAN_GREET, 1u);
 
             return true;
         }
