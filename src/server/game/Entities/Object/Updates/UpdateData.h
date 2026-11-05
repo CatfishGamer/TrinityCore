@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
- * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,13 +15,13 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __UPDATEDATA_H
-#define __UPDATEDATA_H
+#ifndef TRINITYCORE_UPDATE_DATA_H
+#define TRINITYCORE_UPDATE_DATA_H
 
-#include "Define.h"
 #include "ByteBuffer.h"
+#include "Define.h"
+#include "FlatSet.h"
 #include "ObjectGuid.h"
-#include <set>
 
 class WorldPacket;
 
@@ -38,28 +37,27 @@ class UpdateData
 {
     public:
         UpdateData(uint32 map);
-        UpdateData(UpdateData&& right) : m_map(right.m_map), m_blockCount(right.m_blockCount),
-            m_outOfRangeGUIDs(std::move(right.m_outOfRangeGUIDs)),
-            m_data(std::move(right.m_data))
-        {
-        }
+        UpdateData(UpdateData&& right) noexcept;
+        UpdateData& operator=(UpdateData&& right) noexcept;
+        ~UpdateData();
 
-        void AddOutOfRangeGUID(GuidSet& guids);
+        void AddDestroyObject(ObjectGuid guid);
         void AddOutOfRangeGUID(ObjectGuid guid);
-        void AddUpdateBlock(const ByteBuffer &block);
+        void AddUpdateBlock() { ++m_blockCount; }
+        ByteBuffer& GetBuffer() { return m_data; }
         bool BuildPacket(WorldPacket* packet);
-        bool HasData() const { return m_blockCount > 0 || !m_outOfRangeGUIDs.empty(); }
+        bool HasData() const { return m_blockCount > 0 || !m_outOfRangeGUIDs.empty() || !m_destroyGUIDs.empty(); }
         void Clear();
-
-        GuidSet const& GetOutOfRangeGUIDs() const { return m_outOfRangeGUIDs; }
 
     protected:
         uint32 m_map;
         uint32 m_blockCount;
-        GuidSet m_outOfRangeGUIDs;
+        Trinity::Containers::FlatSet<ObjectGuid> m_destroyGUIDs;
+        Trinity::Containers::FlatSet<ObjectGuid> m_outOfRangeGUIDs;
         ByteBuffer m_data;
 
         UpdateData(UpdateData const& right) = delete;
         UpdateData& operator=(UpdateData const& right) = delete;
 };
-#endif
+
+#endif // TRINITYCORE_UPDATE_DATA_H

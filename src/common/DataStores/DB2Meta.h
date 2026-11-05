@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
+ * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,10 +20,8 @@
 
 #include "Define.h"
 
-struct TC_COMMON_API DB2MetaField
+struct DB2MetaField
 {
-    DB2MetaField(DBCFormer type, uint8 arraySize, bool isSigned);
-
     DBCFormer Type;
     uint8 ArraySize;
     bool IsSigned;
@@ -31,8 +29,6 @@ struct TC_COMMON_API DB2MetaField
 
 struct TC_COMMON_API DB2Meta
 {
-    DB2Meta(int32 indexField, uint32 fieldCount, uint32 layoutHash, DB2MetaField const* fields, int32 parentIndexField);
-
     bool HasIndexFieldInData() const;
 
     // Returns field index for data loaded in our structures (ID field is appended in the front if not present in db2 file data section)
@@ -41,6 +37,7 @@ struct TC_COMMON_API DB2Meta
     // Returns size of final loaded structure
     uint32 GetRecordSize() const;
 
+    uint32 GetIndexFieldOffset() const;
     int32 GetParentIndexFieldOffset() const;
 
     uint32 GetDbIndexField() const;
@@ -48,9 +45,11 @@ struct TC_COMMON_API DB2Meta
 
     bool IsSignedField(uint32 field) const;
 
+    uint32 FileDataId;
     int32 IndexField;
     int32 ParentIndexField;
     uint32 FieldCount;
+    uint32 FileFieldCount;
     uint32 LayoutHash;
     DB2MetaField const* Fields;
 };
